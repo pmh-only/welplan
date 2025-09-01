@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welstory API Frontend</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin: 0;
+        }
+
+        .content {
+            padding: 15px;
+        }
+
+        .section {
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 3px;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .results {
+            margin-top: 10px;
+        }
+
+        .restaurant-card, .meal-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .restaurant-card:hover, .meal-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .restaurant-card h3, .meal-card h3 {
+            color: #333;
+            margin-bottom: 6px;
+            font-size: 1.1em;
+        }
+
+        .restaurant-card p, .meal-card p {
+            color: #666;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .meal-image {
+            max-width: 200px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .nutrition-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .nutrition-table th, .nutrition-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .nutrition-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); }
+            40% { color: black; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); }
+            60% { text-shadow: .25em 0 0 black, .5em 0 0 rgba(0,0,0,0); }
+            80%, 100% { text-shadow: .25em 0 0 black, .5em 0 0 black; }
+        }
+
+        /* Tab Navigation Styles */
+        .tab-navigation {
+            display: flex;
+            background: #f5f5f5;
+            border-radius: 6px;
+            padding: 3px;
+            margin-bottom: 12px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            color: #666;
+        }
+
+        .tab-btn:hover {
+            background: rgba(76, 175, 80, 0.1);
+            color: #4CAF50;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        /* Tab Content Styles */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Tab-specific styling */
+        #restaurants-tab .section {
+            border-left: 4px solid #4CAF50;
+        }
+
+        #takein-tab .section {
+            border-left: 4px solid #2196F3;
+        }
+
+        #takeout-tab .section {
+            border-left: 4px solid #FF9800;
+        }
+
+        /* Inline form layout for compact forms */
+        .form-inline {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .form-inline .form-group {
+            flex: 1;
+            min-width: 120px;
+            margin-bottom: 0;
+        }
+
+        .form-inline .btn {
+            margin-bottom: 0;
+            align-self: flex-end;
+        }
+
+        /* Compact grid for restaurant cards */
+        .compact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 8px;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            
+            .content {
+                padding: 10px;
+            }
+            
+            .section {
+                padding: 10px;
+                margin-bottom: 10px;
+            }
+            
+            .form-inline {
+                flex-direction: column;
+                gap: 6px;
+            }
+            
+            .form-inline .form-group {
+                min-width: unset;
+            }
+            
+            .tab-btn {
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+            
+            .btn {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .header p {
+                font-size: 0.8em;
+            }
+        }
+
+        /* Meals Table Styles */
+        .meals-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 10px;
+            background: white;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .meals-table th {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .meals-table td {
+            padding: 6px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: top;
+        }
+
+        .meals-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .meals-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .restaurant-badge {
+            background: #4CAF50;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .meal-description {
+            color: #666;
+            font-style: italic;
+            line-height: 1.2;
+        }
+
+        .meal-image-cell {
+            text-align: center;
+            width: 60px;
+        }
+
+        .meal-image-thumb {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .meal-image-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        /* Image Modal */
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: relative;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90%;
+            max-height: 90%;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-close:hover {
+            color: #000;
+        }
+
+        /* Mobile table responsiveness */
+        @media (max-width: 768px) {
+            .meals-table {
+                font-size: 11px;
+            }
+            
+            .meals-table th,
+            .meals-table td {
+                padding: 4px 3px;
+            }
+            
+            .restaurant-badge {
+                font-size: 10px;
+                padding: 1px 4px;
+            }
+            
+            .meal-image-thumb {
+                width: 30px;
+                height: 30px;
+            }
+            
+            .btn-small {
+                padding: 3px 6px;
+                font-size: 14px;
+            }
+        }
+        
+        /* Nutrition column styling */
+        .meals-table .nutrition-col {
+            text-align: center;
+            font-weight: bold;
+            min-width: 60px;
+        }
+        
+        .nutrition-calories { color: #FF6B35 !important; }
+        .nutrition-carbs { color: #4ECDC4 !important; }
+        .nutrition-sugar { color: #45B7D1 !important; }
+        .nutrition-fiber { color: #96CEB4 !important; }
+        .nutrition-fat { color: #FFEAA7 !important; background: #333; }
+        .nutrition-protein { color: #DDA0DD !important; }
+        
+        .nutrition-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            font-size: 11px;
+            padding: 6px 4px;
+        }
+        
+        .nutrition-loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ Welstory API Frontend</h1>
+            <p>Samsung Welstory Cafeteria Management System</p>
+        </div>
+
+        <div class="content">
+            <!-- Status Section -->
+            <div class="section">
+                <h2>🔐 System Status</h2>
+                <div id="loginStatus"></div>
+                <div id="sessionStatus"></div>
+                <div id="userInfoSection" class="hidden">
+                    <div id="userInfo" style="font-size: 13px; margin-bottom: 8px;"></div>
+                </div>
+                <div>
+                    <button class="btn" onclick="checkAuth()">Check Auth</button>
+                    <button class="btn" onclick="refreshSession()">Refresh</button>
+                    <button class="btn" onclick="toggleAutoRefresh()">Toggle Auto</button>
+                    <button class="btn" onclick="getCacheStatus()">Cache Status</button>
+                    <button class="btn" onclick="clearCache()">Clear Cache</button>
+                </div>
+                <div id="cacheStatus" class="results"></div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="tab-navigation">
+                <button class="tab-btn active" onclick="switchTab('restaurants', this)">🍽️ Restaurant Selection</button>
+                <button class="tab-btn" onclick="switchTab('takein', this)">🍴 Take In Meals</button>
+                <button class="tab-btn" onclick="switchTab('takeout', this)">📦 Take Out Meals</button>
+            </div>
+
+            <!-- Restaurant Selection Tab -->
+            <div id="restaurants-tab" class="tab-content active">
+                <!-- Restaurant Search Section -->
+                <div class="section">
+                    <h2>🔍 Search Restaurants</h2>
+                    <div id="searchStatus"></div>
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label for="restaurantSearch">Restaurant Name:</label>
+                            <input type="text" id="restaurantSearch" placeholder="Enter restaurant name">
+                        </div>
+                        <button class="btn" onclick="searchRestaurants()">Search</button>
+                    </div>
+                    <div id="restaurantResults" class="results"></div>
+                </div>
+
+                <!-- Selected Restaurants Section -->
+                <div class="section">
+                    <h2>📍 Selected Restaurants</h2>
+                    <div id="selectedRestaurantsStatus"></div>
+                    <div id="selectedRestaurantsList" class="results">
+                        <p>No restaurants selected. Search and select restaurants above.</p>
+                    </div>
+                    <button class="btn" onclick="clearSelectedRestaurants()">Clear All Selections</button>
+                </div>
+            </div>
+
+            <!-- Take In Meals Tab -->
+            <div id="takein-tab" class="tab-content">
+                <!-- Meals Section -->
+                <div class="section">
+                    <h2>🍴 Take In Meals</h2>
+                    <div id="takeinMealsStatus"></div>
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label for="takeinMealDate">Date:</label>
+                            <input type="text" id="takeinMealDate" placeholder="20250101" value="" onchange="onTakeinMealDateChange()">
+                        </div>
+                        <div class="form-group">
+                            <label for="takeinMealTimeId">Meal Time:</label>
+                            <select id="takeinMealTimeId" onchange="onTakeinMealTimeChange()">
+                                <option value="">Select meal time</option>
+                            </select>
+                        </div>
+                        <button class="btn" onclick="getTakeinMeals()">Get Take In Meals</button>
+                    </div>
+                    <div id="takeinMealsResults" class="results"></div>
+                </div>
+
+                <!-- Nutritional Information Section -->
+                <div class="section">
+                    <h2>📊 Nutritional Information</h2>
+                    <div id="takeinNutritionStatus"></div>
+                    <div id="takeinNutritionResults" class="results"></div>
+                </div>
+            </div>
+
+            <!-- Take Out Meals Tab -->
+            <div id="takeout-tab" class="tab-content">
+                <!-- Meals Section -->
+                <div class="section">
+                    <h2>📦 Take Out Meals</h2>
+                    <div id="takeoutMealsStatus"></div>
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label for="takeoutMealDate">Date:</label>
+                            <input type="text" id="takeoutMealDate" placeholder="20250101" value="" onchange="onTakeoutMealDateChange()">
+                        </div>
+                        <div class="form-group">
+                            <label for="takeoutMealTimeId">Meal Time:</label>
+                            <select id="takeoutMealTimeId" onchange="onTakeoutMealTimeChange()">
+                                <option value="">Select meal time</option>
+                            </select>
+                        </div>
+                        <button class="btn" onclick="getTakeoutMeals()">Get Take Out Meals</button>
+                    </div>
+                    <div id="takeoutMealsResults" class="results"></div>
+                </div>
+
+                <!-- Nutritional Information Section -->
+                <div class="section">
+                    <h2>📊 Nutritional Information</h2>
+                    <div id="takeoutNutritionStatus"></div>
+                    <div id="takeoutNutritionResults" class="results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
