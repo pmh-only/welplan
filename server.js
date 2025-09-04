@@ -607,6 +607,83 @@ app.post('/api/meals/nutrition', async (req, res) => {
     }
 });
 
+// Get menu items for a meal (for take-out detailed view)
+app.post('/api/meals/menu-items', async (req, res) => {
+    try {
+        const { mealData, sessionId } = req.body;
+        
+        // Create cache key based on meal properties
+        const cacheKey = getCacheKey(
+            'menu_items',
+            mealData.restaurantData.id,
+            mealData.date,
+            mealData.mealTimeId,
+            mealData.hallNo,
+            mealData.name,
+            mealData.menuCourseName,
+            mealData.menuCourseType
+        );
+        
+        // Try to get from cache first
+        let cachedData = readCache(cacheKey);
+        if (cachedData) {
+            console.log(`📋 Cache hit for menu items: ${mealData.name}`);
+            return res.json({
+                success: true,
+                menuItems: cachedData,
+                mealName: mealData.name,
+                cached: true
+            });
+        }
+        
+        console.log(`🔄 Cache miss for menu items: ${mealData.name}`);
+        const client = getClient(sessionId || 'default');
+        
+        // Create restaurant and meal objects from data
+        const { WelstoryRestaurant, WelstoryMeal } = await import('welstory-api-wrapper');
+        
+        const restaurant = new WelstoryRestaurant(
+            client,
+            mealData.restaurantData.id,
+            mealData.restaurantData.name,
+            mealData.restaurantData.description
+        );
+        
+        const meal = new WelstoryMeal(
+            client,
+            restaurant,
+            mealData.hallNo,
+            mealData.date,
+            mealData.mealTimeId,
+            mealData.name,
+            mealData.menuCourseName,
+            mealData.menuCourseType,
+            mealData.setName,
+            mealData.subMenuTxt,
+            mealData.photoUrl
+        );
+        
+        const menuItems = await meal.listMealMenus();
+        
+        // Cache the result
+        writeCache(cacheKey, menuItems);
+        console.log(`💾 Cached menu items data for ${mealData.name}`);
+        
+        res.json({
+            success: true,
+            menuItems,
+            mealName: mealData.name,
+            cached: false
+        });
+
+    } catch (error) {
+        console.error('Menu items error:', error);
+        res.status(400).json({ 
+            error: error.message || 'Failed to get menu items' 
+        });
+    }
+});
+
 // Cache management endpoints
 
 // Get cache status

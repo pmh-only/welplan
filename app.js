@@ -846,6 +846,43 @@ window.getTakeoutMeals = async function() {
     await fetchMeals(dateStr, mealTimeId, 'takeout', 'takeoutMealsStatus', 'takeoutMealsResults');
 };
 
+// Fetch menu items for multiple meals
+async function fetchMenuItemsForMeals(meals) {
+    console.log(`🍽️  Fetching menu items for ${meals.length} meals`);
+    
+    const mealsWithMenuItems = [];
+    
+    for (const meal of meals) {
+        try {
+            const result = await apiCall('/meals/menu-items', {
+                mealData: meal
+            });
+            
+            if (result.success && result.menuItems && result.menuItems.length > 0) {
+                mealsWithMenuItems.push({
+                    ...meal,
+                    menuItems: result.menuItems
+                });
+                console.log(`✅ Fetched ${result.menuItems.length} menu items for ${meal.name}${result.cached ? ' (cached)' : ''}`);
+            } else {
+                console.warn(`⚠️  No menu items for ${meal.name}`);
+                mealsWithMenuItems.push({
+                    ...meal,
+                    menuItems: []
+                });
+            }
+        } catch (error) {
+            console.error(`❌ Failed to get menu items for ${meal.name}:`, error.message);
+            mealsWithMenuItems.push({
+                ...meal,
+                menuItems: []
+            });
+        }
+    }
+    
+    return mealsWithMenuItems;
+}
+
 // Fetch nutrition data for multiple meals using bulk API
 async function fetchNutritionForMeals(meals) {
     console.log(`🚀 Using bulk nutrition API for ${meals.length} meals`);
@@ -943,9 +980,12 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
     
     // Check if this is Take In meals and should show nutrition
     const isTakeInMeals = resultsElementId === 'takeinMealsResults';
+    // Check if this is Take Out meals and should show menu items
+    const isTakeOutMeals = resultsElementId === 'takeoutMealsResults';
     
-    // If Take In meals, fetch nutrition data for all meals
-    let mealsWithNutrition = meals;
+    // Prepare meals data based on the meal type
+    let processedMeals = meals;
+    
     if (isTakeInMeals) {
         console.log('🍴 Fetching nutrition data for Take In meals...');
         // Show enhanced loading message
@@ -957,79 +997,180 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                 </p>
             </div>
         `;
-        mealsWithNutrition = await fetchNutritionForMeals(meals);
+        processedMeals = await fetchNutritionForMeals(meals);
+    } else if (isTakeOutMeals) {
+        console.log('📦 Fetching menu items for Take Out meals...');
+        // Show enhanced loading message
+        resultsDiv.innerHTML = `
+            <div class="menu-items-loading">
+                <div class="loading">⚡ Loading ${meals.length} meals with detailed menu items...</div>
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    Fetching all individual menu items for each meal. This may take a moment.
+                </p>
+            </div>
+        `;
+        processedMeals = await fetchMenuItemsForMeals(meals);
     }
     
-    const nutritionColumns = isTakeInMeals ? `
-        <th class="nutrition-header">Calories</th>
-        <th class="nutrition-header">Carbs (g)</th>
-        <th class="nutrition-header">Sugar (g)</th>
-        <th class="nutrition-header">Fiber (g)</th>
-        <th class="nutrition-header">Fat (g)</th>
-        <th class="nutrition-header">Protein (g)</th>
-    ` : '';
+    let tableHTML = '';
     
-    const tableHTML = `
-        <table class="meals-table">
-            <thead>
-                <tr>
-                    <th>Restaurant</th>
-                    <th>Meal Name</th>
-                    <th>Course</th>
-                    <th>Type</th>
-                    <th>Set</th>
-                    <th>Hall</th>
-                    <th>Image</th>
-                    ${nutritionColumns}
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${mealsWithNutrition.map((meal, index) => {
-                    const nutritionCells = isTakeInMeals && meal.nutritionTotals ? `
-                        <td class="nutrition-col nutrition-calories">${meal.nutritionTotals.calories || 0}</td>
-                        <td class="nutrition-col nutrition-carbs">${meal.nutritionTotals.carbs || 0}</td>
-                        <td class="nutrition-col nutrition-sugar">${meal.nutritionTotals.sugar || 0}</td>
-                        <td class="nutrition-col nutrition-fiber">${meal.nutritionTotals.fiber || 0}</td>
-                        <td class="nutrition-col nutrition-fat">${meal.nutritionTotals.fat || 0}</td>
-                        <td class="nutrition-col nutrition-protein">${meal.nutritionTotals.protein || 0}</td>
-                    ` : isTakeInMeals ? `
-                        <td colspan="6" class="nutrition-loading">Nutrition data unavailable</td>
-                    ` : '';
-                    
-                    return `
+    if (isTakeOutMeals) {
+        // Take-out meals: Show individual menu items in table format with nutrition
+        const allMenuItems = [];
+        let menuItemIndex = 0;
+        
+        processedMeals.forEach((meal, mealIndex) => {
+            if (meal.menuItems && meal.menuItems.length > 0) {
+                meal.menuItems.forEach(item => {
+                    // Filter out main menu items (items with isMain = true)
+                    if (!item.isMain) {
+                        allMenuItems.push({
+                            ...item,
+                            mealName: meal.name,
+                            restaurantName: meal.restaurantName,
+                            menuCourseName: meal.menuCourseName,
+                            menuCourseType: meal.menuCourseType,
+                            setName: meal.setName,
+                            hallNo: meal.hallNo,
+                            photoUrl: meal.photoUrl,
+                            originalMealIndex: mealIndex,
+                            menuItemIndex: menuItemIndex++
+                        });
+                    }
+                });
+            }
+        });
+
+        tableHTML = `
+            <table class="meals-table">
+                <thead>
                     <tr>
-                        <td>
-                            <span class="restaurant-badge">
-                                📍 ${meal.restaurantName || 'Unknown'}
-                            </span>
-                        </td>
-                        <td>
-                            <strong>${meal.name}</strong>
-                            ${meal.subMenuTxt ? `<br><small class="meal-description">${meal.subMenuTxt}</small>` : ''}
-                        </td>
-                        <td>${meal.menuCourseName}</td>
-                        <td>${meal.menuCourseType}</td>
-                        <td>${meal.setName || '-'}</td>
-                        <td>${meal.hallNo}</td>
-                        <td class="meal-image-cell">
-                            ${meal.photoUrl ? `<img class="meal-image-thumb" src="${meal.photoUrl}" alt="${meal.name}" onerror="this.style.display='none'" onclick="showImageModal('${meal.photoUrl}', '${meal.name}')">` : '-'}
-                        </td>
-                        ${nutritionCells}
-                        <td>
-                            <button class="btn btn-small" onclick="getNutritionInfo(${index})" title="Get Nutrition Info">📊</button>
-                        </td>
+                        <th>Restaurant</th>
+                        <th>Meal</th>
+                        <th>Menu Item</th>
+                        <th>Course</th>
+                        <th>Type</th>
+                        <th>Set</th>
+                        <th>Hall</th>
+                        <th class="nutrition-header">Calories</th>
+                        <th class="nutrition-header">Carbs (g)</th>
+                        <th class="nutrition-header">Sugar (g)</th>
+                        <th class="nutrition-header">Fiber (g)</th>
+                        <th class="nutrition-header">Fat (g)</th>
+                        <th class="nutrition-header">Protein (g)</th>
                     </tr>
-                    `;
-                }).join('')}
-            </tbody>
-        </table>
-    `;
+                </thead>
+                <tbody>
+                    ${allMenuItems.map((item, index) => `
+                        <tr>
+                            <td>
+                                <span class="restaurant-badge">
+                                    📍 ${item.restaurantName || 'Unknown'}
+                                </span>
+                            </td>
+                            <td>
+                                <strong>${item.mealName}</strong>
+                            </td>
+                            <td>
+                                <strong>${item.name}</strong>
+                            </td>
+                            <td>${item.menuCourseName}</td>
+                            <td>${item.menuCourseType}</td>
+                            <td>${item.setName || '-'}</td>
+                            <td>${item.hallNo}</td>
+                            <td class="nutrition-col nutrition-calories">${item.calorie || 0}</td>
+                            <td class="nutrition-col nutrition-carbs">${item.carbohydrate || 0}</td>
+                            <td class="nutrition-col nutrition-sugar">${item.sugar || 0}</td>
+                            <td class="nutrition-col nutrition-fiber">${item.fiber || 0}</td>
+                            <td class="nutrition-col nutrition-fat">${item.fat || 0}</td>
+                            <td class="nutrition-col nutrition-protein">${item.protein || 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            ${allMenuItems.length === 0 ? '<p>No menu items found for the selected take-out meals.</p>' : ''}
+        `;
+    } else {
+        // Take-in meals or default: Show table view with nutrition
+        const nutritionColumns = isTakeInMeals ? `
+            <th class="nutrition-header">Calories</th>
+            <th class="nutrition-header">Carbs (g)</th>
+            <th class="nutrition-header">Sugar (g)</th>
+            <th class="nutrition-header">Fiber (g)</th>
+            <th class="nutrition-header">Fat (g)</th>
+            <th class="nutrition-header">Protein (g)</th>
+        ` : '';
+        
+        tableHTML = `
+            <table class="meals-table">
+                <thead>
+                    <tr>
+                        <th>Restaurant</th>
+                        <th>Meal Name</th>
+                        <th>Course</th>
+                        <th>Type</th>
+                        <th>Set</th>
+                        <th>Hall</th>
+                        <th>Image</th>
+                        ${nutritionColumns}
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${processedMeals.map((meal, index) => {
+                        const nutritionCells = isTakeInMeals && meal.nutritionTotals ? `
+                            <td class="nutrition-col nutrition-calories">${meal.nutritionTotals.calories || 0}</td>
+                            <td class="nutrition-col nutrition-carbs">${meal.nutritionTotals.carbs || 0}</td>
+                            <td class="nutrition-col nutrition-sugar">${meal.nutritionTotals.sugar || 0}</td>
+                            <td class="nutrition-col nutrition-fiber">${meal.nutritionTotals.fiber || 0}</td>
+                            <td class="nutrition-col nutrition-fat">${meal.nutritionTotals.fat || 0}</td>
+                            <td class="nutrition-col nutrition-protein">${meal.nutritionTotals.protein || 0}</td>
+                        ` : isTakeInMeals ? `
+                            <td colspan="6" class="nutrition-loading">Nutrition data unavailable</td>
+                        ` : '';
+                        
+                        return `
+                        <tr>
+                            <td>
+                                <span class="restaurant-badge">
+                                    📍 ${meal.restaurantName || 'Unknown'}
+                                </span>
+                            </td>
+                            <td>
+                                <strong>${meal.name}</strong>
+                                ${meal.subMenuTxt ? `<br><small class="meal-description">${meal.subMenuTxt}</small>` : ''}
+                            </td>
+                            <td>${meal.menuCourseName}</td>
+                            <td>${meal.menuCourseType}</td>
+                            <td>${meal.setName || '-'}</td>
+                            <td>${meal.hallNo}</td>
+                            <td class="meal-image-cell">
+                                ${meal.photoUrl ? `<img class="meal-image-thumb" src="${meal.photoUrl}" alt="${meal.name}" onerror="this.style.display='none'" onclick="showImageModal('${meal.photoUrl}', '${meal.name}')">` : '-'}
+                            </td>
+                            ${nutritionCells}
+                            <td>
+                                <button class="btn btn-small" onclick="getNutritionInfo(${index})" title="Get Nutrition Info">📊</button>
+                            </td>
+                        </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+    }
     
     resultsDiv.innerHTML = tableHTML;
     
+    // Make the table sortable
+    setTimeout(() => {
+        const table = resultsDiv.querySelector('.meals-table');
+        if (table) {
+            makeTableSortable(table, resultsElementId);
+        }
+    }, 100);
+    
     // Store meals globally for nutrition access
-    window.currentMeals = mealsWithNutrition;
+    window.currentMeals = processedMeals;
     // Store which results area this is for nutrition display
     window.currentMealsResultsId = resultsElementId;
 }
@@ -1380,4 +1521,89 @@ window.onTakeoutMealTimeChange = function() {
         console.log('📦 Auto-fetching Take Out meals due to meal time change...');
         getTakeoutMeals();
     }
+}
+
+// Table sorting functionality
+function sortTable(tableId, columnIndex, dataType = 'string') {
+    const table = document.getElementById(tableId) || document.querySelector(`#${tableId} table`) || document.querySelector('.meals-table');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const currentDirection = table.getAttribute('data-sort-direction') || 'asc';
+    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    
+    // Clear previous sort indicators
+    table.querySelectorAll('th').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        th.setAttribute('title', th.textContent + ' (click to sort)');
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        const aCell = a.cells[columnIndex];
+        const bCell = b.cells[columnIndex];
+        
+        if (!aCell || !bCell) return 0;
+        
+        let aValue = aCell.textContent.trim();
+        let bValue = bCell.textContent.trim();
+        
+        // Handle different data types
+        if (dataType === 'number') {
+            aValue = parseFloat(aValue) || 0;
+            bValue = parseFloat(bValue) || 0;
+        } else if (dataType === 'string') {
+            aValue = aValue.toLowerCase();
+            bValue = bValue.toLowerCase();
+        }
+        
+        let comparison = 0;
+        if (aValue > bValue) comparison = 1;
+        else if (aValue < bValue) comparison = -1;
+        
+        return newDirection === 'desc' ? -comparison : comparison;
+    });
+    
+    // Update DOM
+    rows.forEach(row => tbody.appendChild(row));
+    
+    // Update sort indicators
+    const targetHeader = table.querySelectorAll('th')[columnIndex];
+    if (targetHeader) {
+        targetHeader.classList.add(newDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+        targetHeader.setAttribute('title', `${targetHeader.textContent} (sorted ${newDirection})`);
+    }
+    
+    table.setAttribute('data-sort-direction', newDirection);
+}
+
+// Make table headers sortable
+function makeTableSortable(tableElement, tableId) {
+    if (!tableElement) return;
+    
+    const headers = tableElement.querySelectorAll('thead th');
+    headers.forEach((header, index) => {
+        header.style.cursor = 'pointer';
+        header.style.userSelect = 'none';
+        header.setAttribute('title', header.textContent + ' (click to sort)');
+        
+        // Determine data type based on column content
+        let dataType = 'string';
+        if (header.classList.contains('nutrition-header') || 
+            header.textContent.includes('Calories') || 
+            header.textContent.includes('Carbs') || 
+            header.textContent.includes('Sugar') || 
+            header.textContent.includes('Fiber') || 
+            header.textContent.includes('Fat') || 
+            header.textContent.includes('Protein')) {
+            dataType = 'number';
+        }
+        
+        header.addEventListener('click', () => {
+            sortTable(tableId, index, dataType);
+        });
+    });
 }
