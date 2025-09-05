@@ -777,7 +777,7 @@ async function fetchMeals(dateStr, mealTimeId, mealType = 'all', statusElementId
                     return true;
                 }
                 // Otherwise, exclude T/O meals
-                return !meal.menuCourseName || !meal.menuCourseName.startsWith('T/O');
+                return !meal.menuCourseName || !(meal.menuCourseName.startsWith('T/O') || meal.menuCourseName.includes('Take out') || meal.menuCourseName.includes('선택음료') || meal.name.includes('시차제'));
             });
         } else if (mealType === 'takeout') {
             // Take Out: only include meals with "T/O" prefix in course name, BUT exclude meals with "도시락" in name
@@ -787,7 +787,7 @@ async function fetchMeals(dateStr, mealTimeId, mealType = 'all', statusElementId
                     return false;
                 }
                 // Otherwise, only include T/O meals
-                return meal.menuCourseName && meal.menuCourseName.startsWith('T/O');
+                return meal.menuCourseName && (meal.menuCourseName.startsWith('T/O') || meal.menuCourseName.includes('Take out'));
             });
         }
         
@@ -865,7 +865,7 @@ window.getTakeoutMeals = async function() {
                 return false;
             }
             // Otherwise, only include T/O meals
-            return meal.menuCourseName && meal.menuCourseName.startsWith('T/O');
+            return meal.menuCourseName && meal.menuCourseName.startsWith('T/O') || meal.menuCourseName.includes('Take out');
         });
         
         if (filteredMeals.length === 0) {
@@ -1777,14 +1777,10 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTakeoutRestaurantDropdown();
     updateTakeoutRestaurantDisplay();
     
-    // Auto-authenticate and start session management
-    autoAuthenticate().then(() => {
-        startSessionAutoRefresh();
-        startStatusUpdater();
-    });
-    
     // Set default dates to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('takeinMealDate').value = today;
     document.getElementById('takeoutMealDate').value = today;
+
+    autoFetchMealTimes()
 });
