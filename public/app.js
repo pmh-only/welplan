@@ -41,7 +41,8 @@ function loadSelectedRestaurants() {
     } catch (error) {
         console.warn('Failed to load restaurants from localStorage:', error);
     }
-    return [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([{"id":"REST000007","name":"R5 B1F","description":"모바일|모바일연구소|삼성전자|수원|r5|R5"},{"id":"REST000008","name":"R5 B2F","description":"모바일|모바일연구소|삼성전자|수원│r5│R5"},{"id":"REST000003","name":"R4 레인보우(B1F)","description":"디지털연구소|삼성전자|수원|r4"},{"id":"REST000005","name":"R4 오아시스(B1F)","description":"디지털연구소|삼성전자|수원|r4"},{"id":"REST000013","name":"R3 하모니(B1F)","description":"R3|삼성전자|수원|정보통신연구소|r3 공통 A0042119"}]))
+    return [{"id":"REST000007","name":"R5 B1F","description":"모바일|모바일연구소|삼성전자|수원|r5|R5"},{"id":"REST000008","name":"R5 B2F","description":"모바일|모바일연구소|삼성전자|수원│r5│R5"},{"id":"REST000003","name":"R4 레인보우(B1F)","description":"디지털연구소|삼성전자|수원|r4"},{"id":"REST000005","name":"R4 오아시스(B1F)","description":"디지털연구소|삼성전자|수원|r4"},{"id":"REST000013","name":"R3 하모니(B1F)","description":"R3|삼성전자|수원|정보통신연구소|r3 공통 A0042119"}];
 }
 
 function clearStoredRestaurants() {
@@ -51,6 +52,44 @@ function clearStoredRestaurants() {
     } catch (error) {
         console.warn('Failed to clear restaurants from localStorage:', error);
     }
+}
+
+// P-Score settings management
+const PSCORE_SETTINGS_KEY = 'welplan_pscore_settings';
+
+// Default P-Score weights
+const DEFAULT_PSCORE_WEIGHTS = {
+    calorie: 0.1,
+    carb: 0.8,
+    sugar: 2.0,
+    fat: 1.5,
+    protein: 0.5
+};
+
+let pScoreWeights = { ...DEFAULT_PSCORE_WEIGHTS };
+
+function savePScoreSettings() {
+    try {
+        localStorage.setItem(PSCORE_SETTINGS_KEY, JSON.stringify(pScoreWeights));
+        console.log('💾 P-Score settings saved to localStorage');
+    } catch (error) {
+        console.warn('Failed to save P-Score settings to localStorage:', error);
+    }
+}
+
+function loadPScoreSettings() {
+    try {
+        const saved = localStorage.getItem(PSCORE_SETTINGS_KEY);
+        if (saved) {
+            pScoreWeights = { ...DEFAULT_PSCORE_WEIGHTS, ...JSON.parse(saved) };
+            console.log('📂 P-Score settings loaded from localStorage');
+            return pScoreWeights;
+        }
+    } catch (error) {
+        console.warn('Failed to load P-Score settings from localStorage:', error);
+    }
+    pScoreWeights = { ...DEFAULT_PSCORE_WEIGHTS };
+    return pScoreWeights;
 }
 
 // localStorage utilities for take-out restaurant selection
@@ -855,13 +894,25 @@ window.getTakeoutMeals = async function() {
         // Add restaurant info to each meal for identification
         const mealsWithRestaurant = result.meals.map(meal => ({
             ...meal,
-            restaurantName: selectedTakeoutRestaurant.name
+            restaurantName: selectedTakeoutRestaurant.name,
+            mealName: meal.mealName || meal.name // Ensure mealName is available for filtering
         }));
+        
+        // Check if drinks should be filtered out
+        const filterDrinks = document.getElementById('takeoutFilterDrinks')?.checked;
         
         // Filter meals for take-out: only include meals with "T/O" prefix in course name, BUT exclude meals with "도시락" in name
         const filteredMeals = mealsWithRestaurant.filter(meal => {
             // If meal name contains "도시락", it's never Take Out (always Take In)
             if (meal.name && meal.name.includes('도시락')) {
+                return false;
+            }
+            // Filter out drinks if checkbox is checked
+            if (filterDrinks && (
+                (meal.name && (meal.name.includes('음료') || meal.name.includes('드링킹') || meal.name.includes('음료 Zone'))) ||
+                (meal.mealName && (meal.mealName.includes('음료') || meal.mealName.includes('드링킹') || meal.mealName.includes('음료 Zone'))) ||
+                (meal.setName && (meal.setName.includes('음료') || meal.setName.includes('드링킹')))
+            )) {
                 return false;
             }
             // Otherwise, only include T/O meals
@@ -898,14 +949,16 @@ async function fetchMenuItemsForMeals(meals) {
             if (result.success && result.menuItems && result.menuItems.length > 0) {
                 mealsWithMenuItems.push({
                     ...meal,
-                    menuItems: result.menuItems
+                    menuItems: result.menuItems,
+                    mealName: result.mealName || meal.mealName || meal.name // Use the returned mealName from API
                 });
                 console.log(`✅ Fetched ${result.menuItems.length} menu items for ${meal.name}${result.cached ? ' (cached)' : ''}`);
             } else {
                 console.warn(`⚠️  No menu items for ${meal.name}`);
                 mealsWithMenuItems.push({
                     ...meal,
-                    menuItems: []
+                    menuItems: [],
+                    mealName: result.mealName || meal.mealName || meal.name
                 });
             }
         } catch (error) {
@@ -1056,24 +1109,47 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
         const allMenuItems = [];
         let menuItemIndex = 0;
         
+        // Check if drinks should be filtered out
+        const filterDrinks = document.getElementById('takeoutFilterDrinks')?.checked;
+        
         processedMeals.forEach((meal, mealIndex) => {
+            // Skip entire meals that are drinks
+            if (filterDrinks && meal.mealName && (
+                meal.mealName.includes('음료') || 
+                meal.mealName.includes('드링킹') || 
+                meal.mealName.includes('음료 Zone')
+            )) {
+                return; // Skip this entire meal
+            }
+            
             if (meal.menuItems && meal.menuItems.length > 0) {
                 meal.menuItems.forEach(item => {
-                    // Filter out main menu items (items with isMain = true)
-                    if (!item.isMain) {
-                        allMenuItems.push({
-                            ...item,
-                            mealName: meal.name,
-                            restaurantName: meal.restaurantName,
-                            menuCourseName: meal.menuCourseName,
-                            menuCourseType: meal.menuCourseType,
-                            setName: meal.setName,
-                            hallNo: meal.hallNo,
-                            photoUrl: meal.photoUrl,
-                            originalMealIndex: mealIndex,
-                            menuItemIndex: menuItemIndex++
-                        });
+                    // Filter out main menu items (items with isMain = true) first
+                    if (item.isMain) {
+                        return; // Skip main menu items
                     }
+                    
+                    // Filter out drinks if checkbox is checked (only for non-main items now)
+                    if (filterDrinks && (
+                        (item.name && (item.name.includes('음료') || item.name.includes('드링킹') || item.name.includes('음료 Zone'))) ||
+                        (item.setName && (item.setName.includes('음료') || item.setName.includes('드링킹'))) ||
+                        (item.mealName && (item.mealName.includes('음료 Zone') || item.mealName.includes('드링킹')))
+                    )) {
+                        return; // Skip this drink item
+                    }
+                    
+                    allMenuItems.push({
+                        ...item,
+                        mealName: meal.name,
+                        restaurantName: meal.restaurantName,
+                        menuCourseName: meal.menuCourseName,
+                        menuCourseType: meal.menuCourseType,
+                        setName: meal.setName,
+                        hallNo: meal.hallNo,
+                        photoUrl: meal.photoUrl,
+                        originalMealIndex: mealIndex,
+                        menuItemIndex: menuItemIndex++
+                    });
                 });
             }
         });
@@ -1085,6 +1161,7 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                         <th>Restaurant</th>
                         <th>Meal</th>
                         <th>Menu Item</th>
+                        <th class="nutrition-header pscore">P-Score</th>
                         <th class="nutrition-header calories">칼로리</th>
                         <th class="nutrition-header carbs">탄수화물</th>
                         <th class="nutrition-header sugar">당</th>
@@ -1093,7 +1170,19 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                     </tr>
                 </thead>
                 <tbody>
-                    ${allMenuItems.map((item, index) => `
+                    ${allMenuItems.map((item) => {
+                        // Calculate P-Score for individual menu item
+                        const itemNutrition = {
+                            calories: item.calorie || 0,
+                            carbs: item.carbohydrate || 0,
+                            sugar: item.sugar || 0,
+                            fat: item.fat || 0,
+                            protein: item.protein || 0
+                        };
+                        const pScore = calculatePScore(itemNutrition);
+                        const pScoreColor = pScore <= 20 ? '#22c55e' : pScore <= 50 ? '#f59e0b' : '#ef4444';
+                        
+                        return `
                         <tr>
                             <td>
                                 <span class="restaurant-badge">
@@ -1106,13 +1195,15 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                             <td>
                                 <strong>[${item.setName || '-'}] ${item.name}</strong>
                             </td>
+                            <td class="nutrition-col nutrition-pscore" style="background-color: ${pScoreColor}20; color: ${pScoreColor}; font-weight: bold;">${pScore || 'N/A'}</td>
                             <td class="nutrition-col nutrition-calories">${Math.floor((item.calorie || 0)*100)/100} kcal</td>
                             <td class="nutrition-col nutrition-carbs">${Math.floor((item.carbohydrate || 0)*100)/100}g</td>
                             <td class="nutrition-col nutrition-sugar">${Math.floor((item.sugar || 0)*100)/100}g</td>
                             <td class="nutrition-col nutrition-fat">${Math.floor((item.fat || 0)*100)/100}g</td>
                             <td class="nutrition-col nutrition-protein">${Math.floor((item.protein || 0)*100)/100}g</td>
                         </tr>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
             ${allMenuItems.length === 0 ? '<p>No menu items found for the selected take-out meals.</p>' : ''}
@@ -1120,6 +1211,7 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
     } else {
         // Take-in meals or default: Show table view with nutrition
         const nutritionColumns = isTakeInMeals ? `
+            <th class="nutrition-header pscore">P-Score</th>
             <th class="nutrition-header calories">칼로리</th>
             <th class="nutrition-header carbs">탄수화물</th>
             <th class="nutrition-header sugar">당</th>
@@ -1173,7 +1265,12 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                                 };
                             }
                             
+                            // Calculate P-Score
+                            const pScore = calculatePScore(nutritionTotals);
+                            const pScoreColor = pScore <= 50 ? '#22c55e' : pScore <= 100 ? '#f59e0b' : '#ef4444';
+                            
                             nutritionCells = `
+                                <td class="nutrition-col nutrition-pscore" style="background-color: ${pScoreColor}20; color: ${pScoreColor}; font-weight: bold;">${pScore || 'N/A'}</td>
                                 <td class="nutrition-col nutrition-calories">${Math.floor((nutritionTotals.calories || 0)*100)/100} kcal</td>
                                 <td class="nutrition-col nutrition-carbs">${Math.floor((nutritionTotals.carbs || 0)*100)/100}g</td>
                                 <td class="nutrition-col nutrition-sugar">${Math.floor((nutritionTotals.sugar || 0)*100)/100}g</td>
@@ -1181,7 +1278,7 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                                 <td class="nutrition-col nutrition-protein">${Math.floor((nutritionTotals.protein || 0)*100)/100}g</td>
                             `;
                         } else if (isTakeInMeals) {
-                            nutritionCells = `<td colspan="6" class="nutrition-loading">Nutrition data unavailable</td>`;
+                            nutritionCells = `<td colspan="7" class="nutrition-loading">Nutrition data unavailable</td>`;
                         }
                         
                         return `
@@ -1683,6 +1780,14 @@ window.onTakeoutMealTimeChange = function() {
     }
 }
 
+// Handle Take Out drinks filter change
+window.onTakeoutFilterDrinksChange = function() {
+    // Re-display the current take-out meals with the new filter
+    if (window.currentMeals && window.currentMeals.length > 0 && window.currentMealsResultsId === 'takeoutMealsResults') {
+        displayMeals(window.currentMeals, 'takeoutMealsResults');
+    }
+};
+
 // Table sorting functionality
 function sortTable(tableId, columnIndex, dataType = 'string') {
     const table = document.getElementById(tableId) || document.querySelector(`#${tableId} table`) || document.querySelector('.meals-table');
@@ -1753,6 +1858,7 @@ function makeTableSortable(tableElement, tableId) {
         // Determine data type based on column content
         let dataType = 'string';
         if (header.classList.contains('nutrition-header') || 
+            header.textContent.includes('P-Score') ||
             header.textContent.includes('Calories') || 
             header.textContent.includes('Carbs') || 
             header.textContent.includes('Sugar') || 
@@ -1768,6 +1874,111 @@ function makeTableSortable(tableElement, tableId) {
     });
 }
 
+// P-Score calculation for weight loss (lower = better)
+function calculatePScore(nutritionTotals) {
+    if (!nutritionTotals) return null;
+    
+    const { calories = 0, carbs = 0, sugar = 0, fat = 0, protein = 0 } = nutritionTotals;
+    
+    // Weight loss P-Score formula (lower is better) - uses custom weights
+    const pScore = 
+        (calories * pScoreWeights.calorie) +    // Calories penalty 
+        (carbs * pScoreWeights.carb) +          // Carbs penalty
+        (sugar * pScoreWeights.sugar) +         // Sugar penalty 
+        (fat * pScoreWeights.fat) -             // Fat penalty
+        (protein * pScoreWeights.protein);      // Protein bonus (negative = good)
+    
+    return Math.max(0, Math.round(pScore * 10) / 10); // Round to 1 decimal, min 0
+}
+
+// P-Score settings management functions
+window.updatePScoreWeights = function() {
+    // Get values from form inputs
+    pScoreWeights.calorie = parseFloat(document.getElementById('calorieWeight').value) || 0;
+    pScoreWeights.carb = parseFloat(document.getElementById('carbWeight').value) || 0;
+    pScoreWeights.sugar = parseFloat(document.getElementById('sugarWeight').value) || 0;
+    pScoreWeights.fat = parseFloat(document.getElementById('fatWeight').value) || 0;
+    pScoreWeights.protein = parseFloat(document.getElementById('proteinWeight').value) || 0;
+    
+    // Save to localStorage
+    savePScoreSettings();
+    
+    // Update the formula display
+    updatePScoreFormulaDisplay();
+    
+    // Re-calculate and display current meals with new weights
+    refreshCurrentMealsWithNewPScore();
+    
+    console.log('⚖️ P-Score weights updated:', pScoreWeights);
+};
+
+window.resetPScoreWeights = function() {
+    // Reset to default values
+    pScoreWeights = { ...DEFAULT_PSCORE_WEIGHTS };
+    
+    // Update form inputs
+    document.getElementById('calorieWeight').value = pScoreWeights.calorie;
+    document.getElementById('carbWeight').value = pScoreWeights.carb;
+    document.getElementById('sugarWeight').value = pScoreWeights.sugar;
+    document.getElementById('fatWeight').value = pScoreWeights.fat;
+    document.getElementById('proteinWeight').value = pScoreWeights.protein;
+    
+    // Save to localStorage
+    savePScoreSettings();
+    
+    // Update the formula display
+    updatePScoreFormulaDisplay();
+    
+    // Re-calculate and display current meals
+    refreshCurrentMealsWithNewPScore();
+    
+    console.log('🔄 P-Score weights reset to defaults');
+};
+
+function updatePScoreFormulaDisplay() {
+    const elements = {
+        calorie: document.getElementById('currentCalorieWeight'),
+        carb: document.getElementById('currentCarbWeight'),
+        sugar: document.getElementById('currentSugarWeight'),
+        fat: document.getElementById('currentFatWeight'),
+        protein: document.getElementById('currentProteinWeight')
+    };
+    
+    if (elements.calorie) elements.calorie.textContent = pScoreWeights.calorie;
+    if (elements.carb) elements.carb.textContent = pScoreWeights.carb;
+    if (elements.sugar) elements.sugar.textContent = pScoreWeights.sugar;
+    if (elements.fat) elements.fat.textContent = pScoreWeights.fat;
+    if (elements.protein) elements.protein.textContent = pScoreWeights.protein;
+}
+
+function refreshCurrentMealsWithNewPScore() {
+    // Re-display current meals with updated P-Scores
+    if (window.currentMeals && window.currentMeals.length > 0 && window.currentMealsResultsId) {
+        displayMeals(window.currentMeals, window.currentMealsResultsId);
+    }
+}
+
+function initializePScoreSettings() {
+    // Load saved settings
+    loadPScoreSettings();
+    
+    // Set form values (with safety checks)
+    const calorieInput = document.getElementById('calorieWeight');
+    const carbInput = document.getElementById('carbWeight');
+    const sugarInput = document.getElementById('sugarWeight');
+    const fatInput = document.getElementById('fatWeight');
+    const proteinInput = document.getElementById('proteinWeight');
+    
+    if (calorieInput) calorieInput.value = pScoreWeights.calorie;
+    if (carbInput) carbInput.value = pScoreWeights.carb;
+    if (sugarInput) sugarInput.value = pScoreWeights.sugar;
+    if (fatInput) fatInput.value = pScoreWeights.fat;
+    if (proteinInput) proteinInput.value = pScoreWeights.protein;
+    
+    // Update formula display
+    updatePScoreFormulaDisplay();
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     // Load any saved restaurant selections
@@ -1776,6 +1987,9 @@ document.addEventListener('DOMContentLoaded', function() {
     updateSelectedRestaurantsList();
     updateTakeoutRestaurantDropdown();
     updateTakeoutRestaurantDisplay();
+    
+    // Initialize P-Score settings
+    initializePScoreSettings();
     
     // Set default dates to today
     const today = new Date().toISOString().split('T')[0];
