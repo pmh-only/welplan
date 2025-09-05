@@ -17,60 +17,64 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    align-items: center;
 }
 
 .header {
+    user-select: none;
+    width: 100%;
     background: #1f2937;
     border-bottom: 1px solid #e2e8f0;
-    padding: 20px 24px;
+    padding: 12px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
 .header h1 {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     font-weight: 600;
     color: #f9fafb;
 }
 
 .header p {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: #d1d5db;
     font-weight: 400;
 }
 
 .content {
     flex: 1;
-    padding: 24px;
-    max-width: 100vw;
+    width: 100%;
+    max-width: 1200px;
+    padding: 16px;
     overflow-x: hidden;
 }
 
 .section {
-    margin-bottom: 24px;
-    padding: 24px;
+    margin-bottom: 16px;
+    padding: 16px;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    border-radius: 8px;
     background: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .section h2 {
     color: #374151;
-    margin-bottom: 16px;
-    font-size: 1.25rem;
+    margin-bottom: 12px;
+    font-size: 1.1rem;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .section h2::before {
@@ -82,7 +86,7 @@ body {
 }
 
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .form-group label {
@@ -95,9 +99,9 @@ body {
 
 .form-group input, .form-group select {
     width: 100%;
-    padding: 12px 16px;
+    padding: 8px 12px;
     border: 1px solid #d1d5db;
-    border-radius: 8px;
+    border-radius: 6px;
     font-size: 14px;
     background: #ffffff;
     color: #374151;
@@ -114,23 +118,23 @@ body {
     background: #10b981;
     color: white;
     border: none;
-    padding: 12px 20px;
-    border-radius: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s ease;
-    margin-right: 8px;
-    margin-bottom: 8px;
+    margin-right: 6px;
+    margin-bottom: 6px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
 }
 
 .btn:hover {
     background: #059669;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .btn:active {
@@ -145,11 +149,11 @@ body {
 }
 
 .status {
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 8px;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 13px;
     border: 1px solid transparent;
 }
 
@@ -184,17 +188,17 @@ body {
 .restaurant-card, .meal-card {
     background: #ffffff;
     border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 16px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
 }
 
 .restaurant-card:hover, .meal-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border-color: #9ca3af;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: #10b981;
 }
 
 .restaurant-card h3, .meal-card h3 {
@@ -272,17 +276,17 @@ body {
 .header-tab-btn {
     background: transparent;
     border: none;
-    padding: 12px 16px;
-    font-size: 14px;
+    padding: 8px 12px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 6px;
     transition: all 0.2s ease;
     color: #9ca3af;
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-width: 110px;
+    gap: 4px;
+    min-width: 90px;
     justify-content: center;
 }
 
@@ -328,16 +332,57 @@ body {
 /* Inline form layout for compact forms */
 .form-inline {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: end;
     flex-wrap: wrap;
 }
 
-/* Checkbox styling */
+/* Toggle checkbox styling */
 .form-group input[type="checkbox"] {
-    width: auto;
+    appearance: none;
+    width: 40px;
+    height: 20px;
+    background: #d1d5db;
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
     margin-right: 8px;
-    transform: scale(1.2);
+    flex-shrink: 0;
+}
+
+.form-group input[type="checkbox"]:checked {
+    background: #10b981;
+}
+
+.form-group input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.form-group input[type="checkbox"]:checked::before {
+    left: 22px;
+}
+
+.form-group input[type="checkbox"]:hover {
+    background: #9ca3af;
+}
+
+.form-group input[type="checkbox"]:checked:hover {
+    background: #059669;
+}
+
+.form-group input[type="checkbox"]:focus {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
 }
 
 .form-group label:has(input[type="checkbox"]) {
@@ -346,11 +391,12 @@ body {
     font-weight: 400;
     margin-bottom: 0;
     cursor: pointer;
+    user-select: none;
 }
 
 .form-inline .form-group {
     flex: 1;
-    min-width: 120px;
+    min-width: 100px;
     margin-bottom: 0;
 }
 
@@ -370,29 +416,30 @@ body {
 .meals-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
-    margin-top: 16px;
+    font-size: 13px;
+    margin-top: 12px;
     background: #ffffff;
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .meals-table th {
     background: #f9fafb;
     color: #374151;
-    padding: 16px 12px;
+    padding: 12px 8px;
     text-align: left;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
     border-bottom: 1px solid #e5e7eb;
 }
 
 .meals-table td {
-    padding: 12px;
+    padding: 8px;
     border-bottom: 1px solid #e5e7eb;
     vertical-align: top;
     color: #4b5563;
+    font-size: 13px;
 }
 
 .meals-table tr:hover {
@@ -416,13 +463,13 @@ body {
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     .content {
-        padding: 12px;
+        padding: 8px;
     }
     
     .section {
-        padding: 16px;
-        margin-bottom: 16px;
-        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 6px;
     }
     
     .form-inline {
@@ -435,9 +482,9 @@ body {
     }
     
     .header {
-        padding: 12px 16px;
+        padding: 8px 12px;
         flex-direction: column;
-        gap: 12px;
+        gap: 8px;
     }
     
     .header-navigation {
@@ -521,13 +568,13 @@ body {
 /* Small mobile breakpoint */
 @media (max-width: 480px) {
     .content {
-        padding: 8px;
+        padding: 6px;
     }
     
     .section {
-        padding: 12px;
-        margin-bottom: 12px;
-        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
     }
     
     .section h2 {
@@ -655,15 +702,16 @@ body {
     color: #000;
 }
 
-/* Mobile table responsiveness - Card view (default mobile) */
+/* Enhanced mobile table responsiveness - Card view */
 @media (max-width: 768px) {
     .meals-table {
         font-size: 12px;
         display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
+        overflow: visible;
+        white-space: normal;
+        box-shadow: none;
+        border-radius: 0;
+        margin-top: 8px;
     }
     
     .meals-table thead {
@@ -677,11 +725,19 @@ body {
     .meals-table tr {
         display: block;
         border: 1px solid #e5e7eb;
-        margin-bottom: 8px;
-        border-radius: 6px;
+        margin-bottom: 12px;
+        border-radius: 8px;
         background: white;
-        padding: 8px;
+        padding: 12px;
         position: relative;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+    }
+    
+    .meals-table tr:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+        border-color: #10b981;
     }
     
     /* Sort indicator on mobile cards */
@@ -708,21 +764,31 @@ body {
     
     .meals-table td {
         display: block;
-        padding: 6px 0;
+        padding: 4px 0;
         border: none;
         text-align: left !important;
         white-space: normal;
         word-wrap: break-word;
+        line-height: 1.4;
     }
     
-    /* Add labels for mobile view */
+    /* Enhanced mobile card labels */
     .meals-table td:before {
-        content: attr(data-label) ": ";
-        font-weight: bold;
-        color: #374151;
+        content: attr(data-label);
+        font-weight: 600;
+        color: #6b7280;
         display: inline-block;
-        width: 100px;
-        margin-right: 10px;
+        width: 80px;
+        margin-right: 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .meals-table td:not(:last-child) {
+        border-bottom: 1px solid #f3f4f6;
+        padding-bottom: 6px;
+        margin-bottom: 4px;
     }
     
     /* Special handling for nutrition columns */
@@ -1022,32 +1088,82 @@ body {
     opacity: 1;
 }
 
-/* Touch-friendly enhancements */
+/* Mobile toggle adjustments */
+@media (max-width: 768px) {
+    .form-group input[type="checkbox"] {
+        width: 44px;
+        height: 24px;
+        margin-right: 10px;
+    }
+    
+    .form-group input[type="checkbox"]::before {
+        width: 20px;
+        height: 20px;
+        top: 2px;
+        left: 2px;
+    }
+    
+    .form-group input[type="checkbox"]:checked::before {
+        left: 22px;
+    }
+}
+
+/* Small mobile adjustments */
+@media (max-width: 480px) {
+    .form-group input[type="checkbox"] {
+        width: 36px;
+        height: 20px;
+        margin-right: 8px;
+    }
+    
+    .form-group input[type="checkbox"]::before {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .form-group input[type="checkbox"]:checked::before {
+        left: 18px;
+    }
+}
+
+/* Enhanced touch-friendly interactions */
 @media (pointer: coarse) {
     .btn {
         min-height: 44px; /* iOS recommended touch target */
         min-width: 44px;
+        font-size: 16px; /* Prevent zoom on iOS */
     }
     
     .header-tab-btn {
         min-height: 44px;
         min-width: 88px;
         padding: 12px 16px;
+        -webkit-tap-highlight-color: rgba(255, 255, 255, 0.2);
     }
     
-    input[type="checkbox"] {
-        min-height: 20px;
-        min-width: 20px;
+    .form-group input,
+    .form-group select {
+        min-height: 44px;
+        font-size: 16px; /* Prevent zoom on iOS */
+        padding: 12px 16px;
     }
     
-    .meals-table td {
+    .filter-option {
         min-height: 44px;
         padding: 12px 8px;
+        -webkit-tap-highlight-color: rgba(16, 185, 129, 0.1);
+    }
+    
+    .meals-table tr {
+        min-height: 60px;
+        padding: 16px 12px;
+        -webkit-tap-highlight-color: rgba(16, 185, 129, 0.05);
     }
     
     .btn-small {
         min-height: 36px;
         min-width: 36px;
+        padding: 8px 12px;
     }
     
     /* Better touch targets for sortable headers */
@@ -1055,7 +1171,17 @@ body {
         min-height: 44px;
         padding: 14px 8px;
         cursor: pointer;
-        -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+        -webkit-tap-highlight-color: rgba(16, 185, 129, 0.1);
+    }
+    
+    /* Enhanced visual feedback for touch */
+    .filter-option:active {
+        background: rgba(16, 185, 129, 0.05);
+        border-radius: 4px;
+    }
+    
+    .meals-table tr:active {
+        background: rgba(16, 185, 129, 0.02);
     }
 }
 
@@ -1150,6 +1276,7 @@ select:focus,
 button:focus {
     outline: 2px solid #10b981;
     outline-offset: 2px;
+    border-color: #10b981;
 }
 
 /* High contrast mode support */
@@ -1192,6 +1319,185 @@ button:focus {
     .meal-card:hover {
         transform: none;
     }
+}
+
+/* Mobile-optimized meal controls */
+.meal-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.meal-controls-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.meal-controls .form-group {
+    margin-bottom: 0;
+}
+
+.meal-controls .form-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.restaurant-select {
+    grid-column: 1 / -1;
+}
+
+.meal-filters {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.filter-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.filter-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+}
+
+.filter-option span {
+    color: #374151;
+    font-weight: 500;
+}
+
+.filter-option input[type="checkbox"] {
+    margin-right: 0;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .meal-controls {
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    
+    .meal-controls-row {
+        gap: 8px;
+    }
+    
+    .meal-filters {
+        padding: 10px;
+    }
+    
+    .filter-options {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .filter-option {
+        padding: 6px 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .meal-controls-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .meal-controls .form-group label {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+    
+    .filter-title {
+        font-size: 12px;
+    }
+    
+    .filter-option {
+        font-size: 13px;
+        padding: 8px 0;
+    }
+}
+
+/* Compact UI enhancements */
+.compact-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+    align-items: end;
+}
+
+.compact-form .form-group {
+    margin-bottom: 0;
+}
+
+.info-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    background: #f3f4f6;
+    color: #6b7280;
+    margin-right: 4px;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.quick-actions .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin: 0;
+}
+
+/* Improved visual hierarchy */
+.section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.section-title h2 {
+    margin-bottom: 0;
+}
+
+.section-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.section-actions .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin: 0;
 }
 
 /* Gallery Styles */
@@ -1262,6 +1568,7 @@ button:focus {
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 
@@ -1570,6 +1877,7 @@ button:focus {
     .gallery-item-title {
         font-size: 12px;
         -webkit-line-clamp: 1;
+        line-clamp: 1;
     }
     
     .gallery-item-meta {
