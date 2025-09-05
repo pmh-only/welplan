@@ -422,42 +422,49 @@ async function autoFetchMealTimes() {
         let successCount = 0;
         let errorCount = 0;
         
-        // Fetch meal times from each selected restaurant
-        for (const restaurant of selectedRestaurants) {
+        // Fetch meal times from all selected restaurants in parallel
+        const promises = selectedRestaurants.map(async (restaurant) => {
             try {
                 console.log(`⏳ Fetching meal times for ${restaurant.name}...`);
                 
                 // Ensure restaurant object has required fields
                 if (!restaurant.id || !restaurant.name) {
                     console.warn(`⚠️  Invalid restaurant data for ${restaurant.name || 'unknown'}: missing id or name`);
-                    errorCount++;
-                    continue;
+                    return { success: false, error: 'Invalid restaurant data', restaurant };
                 }
                 
                 const result = await apiCall('/restaurants/meal-times', {
                     restaurantData: restaurant
                 });
                 
-                if (result.success && result.mealTimes && result.mealTimes.length > 0) {
-                    // Add unique meal times
-                    result.mealTimes.forEach(mealTime => {
-                        if (!uniqueMealTimes.has(mealTime.id)) {
-                            uniqueMealTimes.set(mealTime.id, mealTime);
-                            totalFetched++;
-                        }
-                    });
-                    successCount++;
-                    console.log(`✅ Successfully fetched ${result.mealTimes.length} meal times from ${restaurant.name}`);
-                } else {
-                    console.warn(`⚠️  No meal times returned from ${restaurant.name}`);
-                    errorCount++;
-                }
+                return { success: result.success, result, restaurant };
                 
             } catch (error) {
                 console.error(`❌ Failed to get meal times for ${restaurant.name}:`, error.message);
+                return { success: false, error: error.message, restaurant };
+            }
+        });
+        
+        // Wait for all requests to complete
+        const results = await Promise.all(promises);
+        
+        // Process results
+        results.forEach(({ success, result, restaurant, error }) => {
+            if (success && result.mealTimes && result.mealTimes.length > 0) {
+                // Add unique meal times
+                result.mealTimes.forEach(mealTime => {
+                    if (!uniqueMealTimes.has(mealTime.id)) {
+                        uniqueMealTimes.set(mealTime.id, mealTime);
+                        totalFetched++;
+                    }
+                });
+                successCount++;
+                console.log(`✅ Successfully fetched ${result.mealTimes.length} meal times from ${restaurant.name}`);
+            } else {
+                console.warn(`⚠️  No meal times returned from ${restaurant.name}${error ? ': ' + error : ''}`);
                 errorCount++;
             }
-        }
+        });
         
         // Convert Map back to array
         allMealTimes = Array.from(uniqueMealTimes.values());
@@ -583,7 +590,7 @@ function updateMealTimeSelect() {
         if (activeTab && activeTab.id === 'gallery-tab') {
             setTimeout(() => {
                 checkAndAutoLoadGallery();
-            }, 300);
+            }, 50);
         }
     }
 }
@@ -2552,10 +2559,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initializePScoreSettings();
     
     // Set default dates to today
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('takeinMealDate').value = today;
-    document.getElementById('takeoutMealDate').value = today;
-    document.getElementById('galleryDate').value = today;
+    const today = new Date();
+    const todayString = today.getFullYear().toString() + '-' + 
+                       (today.getMonth() + 1).toString().padStart(2, '0') + '-' + 
+                       today.getDate().toString().padStart(2, '0');
+    document.getElementById('takeinMealDate').value = todayString;
+    document.getElementById('takeoutMealDate').value = todayString;
+    document.getElementById('galleryDate').value = todayString;
 
     // Initialize gallery tab as default
     initializeGalleryTab();
@@ -2590,7 +2600,7 @@ function checkAndAutoLoadGallery() {
         showStatus('galleryStatus', '🤖 현재 시간에 맞는 식사로 갤러리를 자동 로딩합니다...', 'info');
         setTimeout(() => {
             loadGallery();
-        }, 800); // Slightly longer delay to show the auto-loading message
+        }, 100); // Minimal delay to show the auto-loading message
     } else if (!mealDate) {
         showStatus('galleryStatus', '📅 날짜가 설정되지 않았습니다', 'info');
     } else if (!mealTimeId) {
