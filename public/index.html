@@ -16,9 +16,10 @@
             
             <!-- Tab Navigation in Header -->
             <div class="header-navigation">
-                <button class="header-tab-btn active" onclick="switchTab('restaurants', this)">🍽️ 식당 설정</button>
+                <button class="header-tab-btn" onclick="switchTab('restaurants', this)">🍽️ 식당 설정</button>
                 <button class="header-tab-btn" onclick="switchTab('takein', this)">🍴 테이크 인</button>
                 <button class="header-tab-btn" onclick="switchTab('takeout', this)">📦 테이크 아웃</button>
+                <button class="header-tab-btn active" onclick="switchTab('gallery', this)">📸 갤러리</button>
                 <button class="header-tab-btn" onclick="switchTab('system', this)">⚙️ 설정</button>
             </div>
         </div>
@@ -27,7 +28,7 @@
             <div class="status info"><strong>베타 테스트 중!</strong> 자주 터지거나 메뉴가 안나올 수 있음. <br>캐싱이 있어서 최초 접속 한번은 느릴 수 있음. 모바일 지원 완료!</div>
 
             <!-- Restaurant Selection Tab -->
-            <div id="restaurants-tab" class="tab-content active">
+            <div id="restaurants-tab" class="tab-content">
                 <div class="status info">식당 추가 했으면 위에 테이크 인/테이크 아웃 탭 눌러라</div>
                 <!-- Restaurant Search Section -->
                 <div class="section">
@@ -116,6 +117,51 @@
                         </div>
                     </div>
                     <div id="takeoutMealsResults" class="results"></div>
+                </div>
+            </div>
+
+            <!-- Gallery Tab -->
+            <div id="gallery-tab" class="tab-content active">
+                <!-- Gallery Controls -->
+                <div class="section">
+                    <h2>📸 메뉴 갤러리</h2>
+                    <div id="galleryStatus"></div>
+                    
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <input type="date" id="galleryDate" value="" onchange="onGalleryDateChange()">
+                        </div>
+                        <div class="form-group">
+                            <select id="galleryMealTimeId" onchange="onGalleryMealTimeChange()">
+                                <option value="">식사 시간 선택</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="gallerySearch" placeholder="메뉴명 검색..." onkeyup="filterGallery()">
+                        </div>
+                        <div class="form-group">
+                            <select id="gallerySortBy" onchange="sortGallery()">
+                                <option value="">정렬 기준</option>
+                                <option value="pscore-asc">P-Score 낮은순 (다이어트 추천)</option>
+                                <option value="pscore-desc">P-Score 높은순</option>
+                                <option value="name-asc">메뉴명 A-Z</option>
+                                <option value="name-desc">메뉴명 Z-A</option>
+                                <option value="restaurant-asc">식당명 A-Z</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="galleryShowLabels" checked onchange="toggleGalleryLabels()"> 
+                                메뉴명 표시
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="gallery-controls">
+                        <span class="gallery-count" id="galleryCount">0개 이미지</span>
+                    </div>
+                    
+                    <div id="galleryGrid" class="gallery-grid"></div>
                 </div>
             </div>
 

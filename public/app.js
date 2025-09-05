@@ -574,6 +574,17 @@ function updateMealTimeSelect() {
                 takeinSelect.value = currentValue;
             }
         }
+        
+        // Also update gallery meal time select
+        updateGalleryMealTimeSelect();
+        
+        // Check if gallery tab is active and can auto-load
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'gallery-tab') {
+            setTimeout(() => {
+                checkAndAutoLoadGallery();
+            }, 300);
+        }
     }
 }
 
@@ -1710,6 +1721,25 @@ window.switchTab = function(tabName, clickedElement = null) {
                 showStatus('takeoutMealsStatus', 'Please select a meal time to view meals', 'info');
             }
         }
+    } else if (tabName === 'gallery') {
+        // Gallery tab - ensure meal times are available
+        if (selectedRestaurants.length === 0) {
+            showStatus('galleryStatus', 'Please select restaurants first in the Restaurant Selection tab', 'info');
+        } else if (allMealTimes.length === 0) {
+            showStatus('galleryStatus', 'Loading meal times...', 'info');
+        } else {
+            const mealDate = document.getElementById('galleryDate').value;
+            const mealTimeId = document.getElementById('galleryMealTimeId').value;
+            
+            if (mealDate && mealTimeId) {
+                console.log('🖼️  Auto-loading gallery for selected date and time...');
+                loadGallery();
+            } else if (!mealDate) {
+                showStatus('galleryStatus', 'Please select a date to view gallery', 'info');
+            } else if (!mealTimeId) {
+                showStatus('galleryStatus', 'Please select a meal time to view gallery', 'info');
+            }
+        }
     }
 }
 
@@ -2107,6 +2137,408 @@ function initializePScoreSettings() {
     updatePScoreFormulaDisplay();
 }
 
+// Gallery functionality
+let galleryMeals = [];
+let filteredGalleryMeals = [];
+
+// Load gallery data
+window.loadGallery = async function() {
+    const dateStr = document.getElementById('galleryDate').value;
+    const mealTimeId = document.getElementById('galleryMealTimeId').value;
+    
+    if (!dateStr || !mealTimeId) {
+        showStatus('galleryStatus', '날짜와 식사 시간을 선택하세요', 'error');
+        return;
+    }
+    
+    if (selectedRestaurants.length === 0) {
+        showStatus('galleryStatus', '먼저 식당을 선택하세요', 'error');
+        return;
+    }
+    
+    try {
+        showStatus('galleryStatus', '갤러리 로딩 중...', 'info');
+        document.getElementById('galleryGrid').innerHTML = '<div class="gallery-loading">메뉴 이미지를 가져오는 중...</div>';
+        
+        const formattedDate = dateStr.includes('-') ? dateStr.replace(/-/g, '') : dateStr;
+        galleryMeals = [];
+        
+        // Fetch meals from all selected restaurants
+        for (const restaurant of selectedRestaurants) {
+            try {
+                const result = await apiCall('/restaurants/meals', {
+                    restaurantData: restaurant,
+                    date: formattedDate,
+                    mealTimeId: mealTimeId
+                });
+                
+                // Add restaurant info and filter meals with photos (Take-In only)
+                const mealsWithPhotos = result.meals.filter(meal => {
+                    // Only include meals with photos
+                    if (!meal.photoUrl) return false;
+                    
+                    // Take In: exclude meals with "T/O" prefix in course name, BUT include meals with "도시락" in name
+                    if (meal.name && meal.name.includes('도시락')) {
+                        return true; // 도시락 is always Take In
+                    }
+                    // Otherwise, exclude T/O meals
+                    return !meal.menuCourseName || !(meal.menuCourseName.startsWith('T/O') || meal.menuCourseName.includes('Take out') || meal.menuCourseName.includes('선택음료') || meal.name.includes('시차제'));
+                }).map(meal => ({
+                    ...meal,
+                    restaurantName: restaurant.name,
+                    restaurantId: restaurant.id
+                }));
+                
+                galleryMeals.push(...mealsWithPhotos);
+                
+            } catch (error) {
+                console.warn(`Failed to get meals for ${restaurant.name}:`, error.message);
+            }
+        }
+        
+        if (galleryMeals.length === 0) {
+            showStatus('galleryStatus', '사진이 있는 메뉴를 찾을 수 없습니다', 'info');
+            document.getElementById('galleryGrid').innerHTML = '<div class="gallery-empty">📷 사진이 있는 메뉴가 없습니다</div>';
+            document.getElementById('galleryCount').textContent = '0개 이미지';
+            return;
+        }
+        
+        // Fetch nutrition data for P-Score calculation
+        showStatus('galleryStatus', `${galleryMeals.length}개 메뉴 사진 발견 - P-Score 계산 중...`, 'info');
+        const mealsWithNutrition = await fetchNutritionForMeals(galleryMeals);
+        galleryMeals = mealsWithNutrition;
+        
+        filteredGalleryMeals = [...galleryMeals];
+        
+        // Default sort by P-Score (lowest first - diet friendly)
+        document.getElementById('gallerySortBy').value = 'pscore-asc';
+        applySortToGallery('pscore-asc');
+        
+        showStatus('galleryStatus', `${galleryMeals.length}개의 테이크인 메뉴 사진을 P-Score 순으로 정렬했습니다`, 'success');
+        
+    } catch (error) {
+        console.error('Gallery load error:', error);
+        showStatus('galleryStatus', `갤러리 로드 실패: ${error.message}`, 'error');
+    }
+};
+
+// Display gallery
+function displayGallery() {
+    const galleryGrid = document.getElementById('galleryGrid');
+    const showLabels = document.getElementById('galleryShowLabels').checked;
+    
+    if (filteredGalleryMeals.length === 0) {
+        galleryGrid.innerHTML = '<div class="gallery-empty">🔍 검색 조건에 맞는 메뉴가 없습니다</div>';
+        document.getElementById('galleryCount').textContent = '0개 이미지';
+        return;
+    }
+    
+    galleryGrid.className = `gallery-grid${!showLabels ? ' no-labels' : ''}`;
+    
+    const sortBy = document.getElementById('gallerySortBy').value;
+    const showRanking = sortBy && sortBy.startsWith('pscore');
+    
+    const galleryHTML = filteredGalleryMeals.map((meal, index) => {
+        // Calculate P-Score
+        let pScoreHTML = '';
+        if (meal.nutritionTotals) {
+            const pScore = calculatePScore(meal.nutritionTotals);
+            const pScoreColor = pScore <= 50 ? '#22c55e' : pScore <= 100 ? '#f59e0b' : '#ef4444';
+            pScoreHTML = `<span class="gallery-pscore" style="background-color: ${pScoreColor}20; color: ${pScoreColor}; border: 1px solid ${pScoreColor}40;">P-Score: ${pScore || 'N/A'}</span>`;
+        } else {
+            pScoreHTML = `<span class="gallery-pscore no-data">P-Score: N/A</span>`;
+        }
+        
+        // Add ranking indicator for P-Score sorting
+        let rankingHTML = '';
+        if (showRanking && meal.nutritionTotals) {
+            const rankNumber = index + 1;
+            const rankEmoji = rankNumber <= 3 ? ['🥇', '🥈', '🥉'][rankNumber - 1] : `#${rankNumber}`;
+            rankingHTML = `<div class="gallery-rank">${rankEmoji}</div>`;
+        }
+        
+        return `
+            <div class="gallery-item ${showRanking ? 'ranked' : ''}" onclick="showGalleryModal(${index})">
+                ${rankingHTML}
+                <img class="gallery-image loading" 
+                     src="${meal.photoUrl}" 
+                     alt="${meal.name}"
+                     onload="this.classList.remove('loading')"
+                     onerror="this.classList.add('error'); this.classList.remove('loading')">
+                <div class="gallery-item-info">
+                    <div class="gallery-item-title">${meal.name}</div>
+                    <div class="gallery-item-meta">
+                        <span class="gallery-restaurant-badge">📍 ${meal.restaurantName}</span>
+                        <span class="gallery-meal-course">${meal.menuCourseName || ''}</span>
+                    </div>
+                    <div class="gallery-pscore-container">
+                        ${pScoreHTML}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    galleryGrid.innerHTML = galleryHTML;
+    document.getElementById('galleryCount').textContent = `${filteredGalleryMeals.length}개 이미지`;
+}
+
+// Filter gallery
+window.filterGallery = function() {
+    const searchTerm = document.getElementById('gallerySearch').value.toLowerCase();
+    
+    if (!searchTerm) {
+        filteredGalleryMeals = [...galleryMeals];
+    } else {
+        filteredGalleryMeals = galleryMeals.filter(meal =>
+            meal.name.toLowerCase().includes(searchTerm) ||
+            meal.restaurantName.toLowerCase().includes(searchTerm) ||
+            (meal.menuCourseName && meal.menuCourseName.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    // Apply current sort after filtering
+    const sortBy = document.getElementById('gallerySortBy').value;
+    if (sortBy) {
+        applySortToGallery(sortBy);
+    } else {
+        displayGallery();
+    }
+};
+
+// Sort gallery
+window.sortGallery = function() {
+    const sortBy = document.getElementById('gallerySortBy').value;
+    
+    if (!sortBy) {
+        displayGallery();
+        return;
+    }
+    
+    applySortToGallery(sortBy);
+};
+
+// Apply sorting to gallery
+function applySortToGallery(sortBy) {
+    const [criterion, direction] = sortBy.split('-');
+    
+    filteredGalleryMeals.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch (criterion) {
+            case 'pscore':
+                aValue = a.nutritionTotals ? calculatePScore(a.nutritionTotals) : 999999; // Put items without P-Score at end
+                bValue = b.nutritionTotals ? calculatePScore(b.nutritionTotals) : 999999;
+                break;
+            case 'name':
+                aValue = a.name.toLowerCase();
+                bValue = b.name.toLowerCase();
+                break;
+            case 'restaurant':
+                aValue = a.restaurantName.toLowerCase();
+                bValue = b.restaurantName.toLowerCase();
+                break;
+            default:
+                return 0;
+        }
+        
+        let comparison = 0;
+        if (typeof aValue === 'number') {
+            comparison = aValue - bValue;
+        } else {
+            if (aValue > bValue) comparison = 1;
+            else if (aValue < bValue) comparison = -1;
+        }
+        
+        return direction === 'desc' ? -comparison : comparison;
+    });
+    
+    displayGallery();
+}
+
+// Toggle gallery labels
+window.toggleGalleryLabels = function() {
+    displayGallery();
+};
+
+// Clear gallery (internal function)
+function clearGallery() {
+    galleryMeals = [];
+    filteredGalleryMeals = [];
+    document.getElementById('galleryGrid').innerHTML = '<div class="gallery-empty">📸 식당을 선택하고 날짜/시간을 설정하면 자동으로 갤러리가 표시됩니다</div>';
+    document.getElementById('galleryCount').textContent = '0개 이미지';
+    document.getElementById('gallerySearch').value = '';
+    document.getElementById('gallerySortBy').value = '';
+}
+
+// Show gallery modal
+window.showGalleryModal = function(index) {
+    const meal = filteredGalleryMeals[index];
+    if (!meal) return;
+    
+    // Calculate P-Score and nutrition info
+    let nutritionHTML = '';
+    if (meal.nutritionTotals) {
+        const pScore = calculatePScore(meal.nutritionTotals);
+        const pScoreColor = pScore <= 50 ? '#22c55e' : pScore <= 100 ? '#f59e0b' : '#ef4444';
+        
+        nutritionHTML = `
+            <div class="gallery-modal-nutrition">
+                <div class="gallery-modal-pscore" style="background-color: ${pScoreColor}20; color: ${pScoreColor}; border: 2px solid ${pScoreColor}60;">
+                    <strong>P-Score: ${pScore || 'N/A'}</strong>
+                </div>
+                <div class="gallery-modal-nutrition-details">
+                    <div class="nutrition-item">
+                        <span class="nutrition-label">칼로리:</span>
+                        <span class="nutrition-value">${Math.floor((meal.nutritionTotals.calories || 0)*100)/100} kcal</span>
+                    </div>
+                    <div class="nutrition-item">
+                        <span class="nutrition-label">탄수화물:</span>
+                        <span class="nutrition-value">${Math.floor((meal.nutritionTotals.carbs || 0)*100)/100}g</span>
+                    </div>
+                    <div class="nutrition-item">
+                        <span class="nutrition-label">당분:</span>
+                        <span class="nutrition-value">${Math.floor((meal.nutritionTotals.sugar || 0)*100)/100}g</span>
+                    </div>
+                    <div class="nutrition-item">
+                        <span class="nutrition-label">지방:</span>
+                        <span class="nutrition-value">${Math.floor((meal.nutritionTotals.fat || 0)*100)/100}g</span>
+                    </div>
+                    <div class="nutrition-item">
+                        <span class="nutrition-label">단백질:</span>
+                        <span class="nutrition-value">${Math.floor((meal.nutritionTotals.protein || 0)*100)/100}g</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        nutritionHTML = `
+            <div class="gallery-modal-nutrition">
+                <div class="gallery-modal-pscore no-data">
+                    <strong>P-Score: N/A</strong>
+                </div>
+                <p style="font-size: 14px; color: #9ca3af; font-style: italic;">영양 정보를 불러올 수 없습니다</p>
+            </div>
+        `;
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'gallery-modal';
+    modal.innerHTML = `
+        <div class="gallery-modal-content">
+            <button class="gallery-modal-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+            <img class="gallery-modal-image" src="${meal.photoUrl}" alt="${meal.name}">
+            <div class="gallery-modal-info">
+                <div class="gallery-modal-title">${meal.name}</div>
+                <div class="gallery-modal-meta">
+                    <span class="gallery-restaurant-badge">📍 ${meal.restaurantName}</span>
+                    <span>${meal.menuCourseName || ''}</span>
+                </div>
+                ${meal.subMenuTxt ? `<p style="margin-top: 8px; font-size: 14px; color: #6b7280;">${meal.subMenuTxt}</p>` : ''}
+                ${nutritionHTML}
+            </div>
+        </div>
+    `;
+    
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+    
+    document.body.appendChild(modal);
+};
+
+// Gallery date change handler
+window.onGalleryDateChange = function() {
+    // Auto-load if all required fields are filled
+    const mealDate = document.getElementById('galleryDate').value;
+    const mealTimeId = document.getElementById('galleryMealTimeId').value;
+    
+    if (mealDate && mealTimeId && selectedRestaurants.length > 0) {
+        console.log('🖼️  Auto-loading gallery due to date change...');
+        loadGallery();
+    }
+};
+
+// Gallery meal time change handler
+window.onGalleryMealTimeChange = function() {
+    // Auto-load if all required fields are filled
+    const mealDate = document.getElementById('galleryDate').value;
+    const mealTimeId = document.getElementById('galleryMealTimeId').value;
+    
+    if (mealDate && mealTimeId && selectedRestaurants.length > 0) {
+        console.log('🖼️  Auto-loading gallery due to meal time change...');
+        loadGallery();
+    }
+};
+
+// Update gallery meal time selector
+function updateGalleryMealTimeSelect() {
+    const gallerySelect = document.getElementById('galleryMealTimeId');
+    
+    if (gallerySelect && allMealTimes.length > 0) {
+        const optionsHTML = '<option value="">식사 시간 선택</option>' + 
+            allMealTimes.map(mealTime => 
+                `<option value="${mealTime.id}">${mealTime.name}</option>`
+            ).join('');
+        
+        const currentValue = gallerySelect.value;
+        gallerySelect.innerHTML = optionsHTML;
+        
+        if (currentValue && allMealTimes.some(mt => mt.id === currentValue)) {
+            gallerySelect.value = currentValue;
+        } else {
+            // Auto-select meal time based on current time
+            const autoSelectedMealTime = getAutoMealTimeSelection();
+            if (autoSelectedMealTime) {
+                gallerySelect.value = autoSelectedMealTime;
+                console.log('🕐 Auto-selected meal time for gallery:', allMealTimes.find(mt => mt.id === autoSelectedMealTime)?.name);
+            }
+        }
+    }
+}
+
+// Auto-select meal time based on current time
+function getAutoMealTimeSelection() {
+    if (allMealTimes.length === 0) return null;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Find the most appropriate meal time based on current time
+    // Priority mapping: 
+    // 6-10: 조식 (breakfast)
+    // 10-15: 중식 (lunch) 
+    // 15-21: 석식 (dinner)
+    // 21-6: 조식 (next day breakfast)
+    
+    let preferredMealNames = [];
+    if (currentHour >= 6 && currentHour < 10) {
+        preferredMealNames = ['조식', '아침'];
+    } else if (currentHour >= 10 && currentHour < 15) {
+        preferredMealNames = ['중식', '점심'];
+    } else if (currentHour >= 15 && currentHour < 21) {
+        preferredMealNames = ['석식', '저녁', '夕食'];
+    } else {
+        // Late night or early morning - default to breakfast for next day
+        preferredMealNames = ['조식', '아침'];
+    }
+    
+    // Try to find exact match first
+    for (const preferredName of preferredMealNames) {
+        const mealTime = allMealTimes.find(mt => 
+            mt.name.includes(preferredName)
+        );
+        if (mealTime) {
+            return mealTime.id;
+        }
+    }
+    
+    // If no exact match, return the first available meal time
+    return allMealTimes[0]?.id || null;
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     // Load any saved restaurant selections
@@ -2123,6 +2555,47 @@ document.addEventListener('DOMContentLoaded', function() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('takeinMealDate').value = today;
     document.getElementById('takeoutMealDate').value = today;
+    document.getElementById('galleryDate').value = today;
+
+    // Initialize gallery tab as default
+    initializeGalleryTab();
 
     autoFetchMealTimes()
 });
+
+// Initialize gallery tab on page load
+function initializeGalleryTab() {
+    // Initialize with empty gallery
+    clearGallery();
+    
+    // Show appropriate guidance based on current state
+    if (selectedRestaurants.length === 0) {
+        showStatus('galleryStatus', '📍 먼저 "🍽️ 식당 설정" 탭에서 식당을 선택하세요', 'info');
+    } else if (allMealTimes.length === 0) {
+        showStatus('galleryStatus', '⏳ 식사 시간 정보를 불러오는 중...', 'info');
+    } else {
+        // Meal times are available, check if we can auto-load
+        checkAndAutoLoadGallery();
+    }
+}
+
+// Check if gallery can auto-load and do so if conditions are met
+function checkAndAutoLoadGallery() {
+    const mealDate = document.getElementById('galleryDate').value;
+    const mealTimeId = document.getElementById('galleryMealTimeId').value;
+    
+    if (mealDate && mealTimeId && selectedRestaurants.length > 0) {
+        // All conditions met - auto-load gallery
+        console.log('🖼️  Auto-loading gallery with auto-selected meal time...');
+        showStatus('galleryStatus', '🤖 현재 시간에 맞는 식사로 갤러리를 자동 로딩합니다...', 'info');
+        setTimeout(() => {
+            loadGallery();
+        }, 800); // Slightly longer delay to show the auto-loading message
+    } else if (!mealDate) {
+        showStatus('galleryStatus', '📅 날짜가 설정되지 않았습니다', 'info');
+    } else if (!mealTimeId) {
+        showStatus('galleryStatus', '🕐 식사 시간을 선택하세요', 'info');
+    } else {
+        showStatus('galleryStatus', '📅 날짜와 식사 시간을 선택한 후 "갤러리 로드" 버튼을 클릭하세요', 'info');
+    }
+}
