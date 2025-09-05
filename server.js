@@ -178,7 +178,7 @@ app.post('/api/restaurants/search', async (req, res) => {
             });
         }
 
-        const restaurants = await client.searchRestaurant(searchQuery);
+        const restaurants = await withAutoRelogin(() => client.searchRestaurant(searchQuery));
         
         // Convert restaurant objects to plain objects for JSON serialization
         const restaurantData = restaurants.map(restaurant => ({
@@ -215,7 +215,7 @@ app.post('/api/restaurants/meal-times', async (req, res) => {
             restaurantData.description
         );
         
-        const mealTimes = await restaurant.listMealTimes();
+        const mealTimes = await withAutoRelogin(() => restaurant.listMealTimes());
         
         res.json({
             success: true,
@@ -260,7 +260,7 @@ app.post('/api/restaurants/meals', async (req, res) => {
             restaurantData.description
         );
         
-        const meals = await restaurant.listMeal(parseInt(date), mealTimeId);
+        const meals = await withAutoRelogin(() => restaurant.listMeal(parseInt(date), mealTimeId));
         
         // Convert meal objects to plain objects
         const mealData = meals.map(meal => ({
@@ -367,7 +367,7 @@ app.post('/api/meals/nutrition/bulk', async (req, res) => {
                     mealData.photoUrl
                 );
                 
-                const nutritionData = await meal.listMealMenus();
+                const nutritionData = await withAutoRelogin(() => meal.listMealMenus());
                 
                 // Process main course detection
                 const processedNutritionData = processMainCourseDetection(nutritionData, mealData.setName);
@@ -473,7 +473,7 @@ app.post('/api/meals/nutrition', async (req, res) => {
             mealData.photoUrl
         );
         
-        const nutritionData = await meal.listMealMenus();
+        const nutritionData = await withAutoRelogin(() => meal.listMealMenus());
         
         // Process main course detection
         const processedNutritionData = processMainCourseDetection(nutritionData, mealData.setName);
@@ -552,7 +552,7 @@ app.post('/api/meals/menu-items', async (req, res) => {
             mealData.photoUrl
         );
         
-        const menuItems = await meal.listMealMenus();
+        const menuItems = await withAutoRelogin(() => meal.listMealMenus());
         
         // Cache the result
         writeCache(cacheKey, menuItems);
@@ -634,6 +634,28 @@ app.post('/api/cache/clear', (req, res) => {
         });
     }
 });
+
+// Re-login wrapper for API calls
+async function withAutoRelogin(apiCallFunction) {
+    try {
+        return await apiCallFunction();
+    } catch (error) {
+        // Always attempt re-login for any API wrapper error
+        console.log('🔄 API wrapper error detected, attempting re-login...');
+        console.log('❌ Original error:', error.message);
+        
+        // Attempt re-login
+        const loginSuccess = await autoLogin();
+        if (loginSuccess) {
+            console.log('✅ Re-login successful, retrying original request...');
+            // Retry the original API call
+            return await apiCallFunction();
+        } else {
+            console.error('❌ Re-login failed, returning original error');
+            throw error;
+        }
+    }
+}
 
 // Error handling middleware
 app.use((error, req, res, next) => {
