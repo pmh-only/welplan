@@ -1,10 +1,11 @@
 // Global state
 let sessionId = 'default';
-let userInfo = null;
 let restaurants = [];
 let selectedRestaurants = []; // Array to store multiple selected restaurants
+let selectedTakeoutRestaurant = null; // Single restaurant for take-out only
 let mealTimes = [];
 let allMealTimes = []; // Store all meal times from all selected restaurants
+let takeoutMealTimes = []; // Store meal times from selected take-out restaurant
 
 // Global session management
 let sessionManager = {
@@ -18,11 +19,12 @@ let sessionManager = {
 
 // localStorage utilities for restaurant selection
 const STORAGE_KEY = 'welplan_selected_restaurants';
+const TAKEOUT_STORAGE_KEY = 'welplan_selected_takeout_restaurant';
 
 function saveSelectedRestaurants() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedRestaurants));
-        console.log(`💾 Saved ${selectedRestaurants.length} selected restaurants to localStorage`);
+        console.log(`💾 선택된 식당 ${selectedRestaurants.length}개를 로컬스토리지에 저장함`);
     } catch (error) {
         console.warn('Failed to save restaurants to localStorage:', error);
     }
@@ -33,7 +35,7 @@ function loadSelectedRestaurants() {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             selectedRestaurants = JSON.parse(saved);
-            console.log(`📂 Loaded ${selectedRestaurants.length} restaurants from localStorage`);
+            console.log(`📂 로컬스토리지에서 식당 ${selectedRestaurants.length}개 로드됨`);
             return selectedRestaurants;
         }
     } catch (error) {
@@ -45,9 +47,43 @@ function loadSelectedRestaurants() {
 function clearStoredRestaurants() {
     try {
         localStorage.removeItem(STORAGE_KEY);
-        console.log('🗑️  Cleared selected restaurants from localStorage');
+        console.log('🗑️  로컬스토리지에서 선택된 식당 삭제됨');
     } catch (error) {
         console.warn('Failed to clear restaurants from localStorage:', error);
+    }
+}
+
+// localStorage utilities for take-out restaurant selection
+function saveTakeoutRestaurant() {
+    try {
+        localStorage.setItem(TAKEOUT_STORAGE_KEY, JSON.stringify(selectedTakeoutRestaurant));
+        console.log(`💾 테이크 아웃 식당을 로컬스토리지에 저장: ${selectedTakeoutRestaurant?.name || '없음'}`);
+    } catch (error) {
+        console.warn('Failed to save take-out restaurant to localStorage:', error);
+    }
+}
+
+function loadTakeoutRestaurant() {
+    try {
+        const saved = localStorage.getItem(TAKEOUT_STORAGE_KEY);
+        if (saved && saved !== 'null') {
+            selectedTakeoutRestaurant = JSON.parse(saved);
+            console.log(`📂 로컬스토리지에서 테이크 아웃 식당 로드: ${selectedTakeoutRestaurant?.name || '없음'}`);
+            return selectedTakeoutRestaurant;
+        }
+    } catch (error) {
+        console.warn('Failed to load take-out restaurant from localStorage:', error);
+    }
+    selectedTakeoutRestaurant = null;
+    return null;
+}
+
+function clearStoredTakeoutRestaurant() {
+    try {
+        localStorage.removeItem(TAKEOUT_STORAGE_KEY);
+        console.log('🗑️  로컬스토리지에서 테이크 아웃 식당 삭제됨');
+    } catch (error) {
+        console.warn('Failed to clear take-out restaurant from localStorage:', error);
     }
 }
 
@@ -67,161 +103,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Generate session ID
     sessionId = 'default'; // Use default session since credentials are in .env
 
-    console.log('Welstory API Frontend initialized');
+    console.log('웰스토리 API 프론트엔드 초기화됨');
     
     // Load saved restaurant selections
     loadSelectedRestaurants();
+    loadTakeoutRestaurant();
     
-    // Automatically authenticate
-    await autoAuthenticate();
 });
 
-// Auto-authenticate function
-async function autoAuthenticate() {
-    try {
-        showLoading('loginStatus', 'Checking authentication status');
-        
-        const result = await apiCall('/login');
-        userInfo = result.userInfo;
-        sessionId = result.sessionId;
-        
-        // Initialize session manager
-        sessionManager.sessionActive = true;
-        sessionManager.lastRefreshTime = new Date();
-        
-        showStatus('loginStatus', 'Automatically authenticated successfully!', 'success');
-        displayUserInfo();
-        
-        // Start automatic session refresh
-        startSessionAutoRefresh();
-        
-        // Start real-time status updater
-        startStatusUpdater();
-        
-        // Update UI with saved restaurant selections
-        if (selectedRestaurants.length > 0) {
-            console.log(`📂 Loaded ${selectedRestaurants.length} restaurants from localStorage:`, selectedRestaurants.map(r => r.name));
-            updateSelectedRestaurantsList();
-            showStatus('selectedRestaurantsStatus', `Loaded ${selectedRestaurants.length} saved restaurant(s) from previous session`, 'success');
-            
-            // Small delay to ensure UI is ready
-            setTimeout(async () => {
-                console.log('🔄 Auto-fetching meal times for loaded restaurants...');
-                await autoFetchMealTimes();
-            }, 100);
-        }
-        
-    } catch (error) {
-        console.error('Auto-authentication error:', error);
-        showStatus('loginStatus', `Authentication failed: ${error.message}. Check server credentials.`, 'error');
-        sessionManager.sessionActive = false;
-        updateSessionStatus();
-    }
-}
 
-// Start automatic session refresh
-function startSessionAutoRefresh() {
-    // Clear any existing timer
-    if (sessionManager.refreshTimer) {
-        clearInterval(sessionManager.refreshTimer);
-    }
-    
-    console.log(`🔄 Starting automatic session refresh every ${sessionManager.refreshInterval / 60000} minutes`);
-    
-    sessionManager.refreshTimer = setInterval(async () => {
-        await performAutoRefresh();
-    }, sessionManager.refreshInterval);
-    
-    // Update session status
-    updateSessionStatus();
-}
-
-// Perform automatic session refresh
-async function performAutoRefresh() {
-    if (sessionManager.isRefreshing || !sessionManager.sessionActive) {
-        return;
-    }
-    
-    sessionManager.isRefreshing = true;
-    sessionManager.refreshCount++;
-    
-    try {
-        console.log(`🔄 Auto-refreshing session (attempt #${sessionManager.refreshCount})`);
-        
-        const result = await apiCall('/refresh');
-        
-        sessionManager.lastRefreshTime = new Date();
-        sessionManager.isRefreshing = false;
-        
-        console.log(`✅ Session auto-refreshed successfully. Expires in ${result.expiresInMinutes} minutes`);
-        
-        // Update UI status
-        showStatus('loginStatus', 
-            `Session auto-refreshed #${sessionManager.refreshCount} at ${sessionManager.lastRefreshTime.toLocaleTimeString()}. Expires in ${result.expiresInMinutes}min`, 
-            'success');
-        
-        updateSessionStatus();
-        
-    } catch (error) {
-        console.error('❌ Auto-refresh failed:', error);
-        sessionManager.isRefreshing = false;
-        sessionManager.sessionActive = false;
-        
-        showStatus('loginStatus', 
-            `Auto-refresh failed (attempt #${sessionManager.refreshCount}): ${error.message}`, 
-            'error');
-        
-        updateSessionStatus();
-        
-        // Stop the timer if refresh fails
-        if (sessionManager.refreshTimer) {
-            clearInterval(sessionManager.refreshTimer);
-            sessionManager.refreshTimer = null;
-        }
-    }
-}
-
-// Start real-time status updater (updates every minute)
-function startStatusUpdater() {
-    updateSessionStatus(); // Initial update
-    
-    // Update status every minute
-    setInterval(() => {
-        updateSessionStatus();
-    }, 60000); // 60 seconds
-}
-
-// Update session status display
-function updateSessionStatus() {
-    const now = new Date();
-    const timeSinceRefresh = sessionManager.lastRefreshTime ? 
-        Math.floor((now - sessionManager.lastRefreshTime) / 1000 / 60) : 0;
-    const nextRefreshIn = Math.max(0, Math.floor(sessionManager.refreshInterval / 1000 / 60 - timeSinceRefresh));
-    
-    const statusElement = document.getElementById('sessionStatus');
-    if (statusElement) {
-        let statusText = '';
-        let statusClass = 'info';
-        
-        if (sessionManager.sessionActive) {
-            if (sessionManager.isRefreshing) {
-                statusText = '🔄 Refreshing session...';
-                statusClass = 'info';
-            } else if (sessionManager.refreshTimer) {
-                statusText = `✅ Auto-refresh ON | Count: ${sessionManager.refreshCount} | Next: ${nextRefreshIn}min`;
-                statusClass = 'success';
-            } else {
-                statusText = `⚠️ Auto-refresh OFF | Count: ${sessionManager.refreshCount} | Manual only`;
-                statusClass = 'info';
-            }
-        } else {
-            statusText = '❌ Session inactive - authentication required';
-            statusClass = 'error';
-        }
-        
-        statusElement.innerHTML = `<div class="status ${statusClass}">Session: ${statusText}</div>`;
-    }
-}
 
 // Enhanced error handling for API calls
 async function safeApiCall(endpoint, data = {}) {
@@ -317,71 +207,13 @@ async function apiCall(endpoint, data = {}) {
     
     return result;
 }
-
-// Check authentication status
-window.checkAuth = async function() {
-    await autoAuthenticate();
-};
-
-window.refreshSession = async function() {
-    if (!userInfo) {
-        showStatus('loginStatus', 'Please login first', 'error');
-        return;
-    }
-
-    try {
-        showLoading('loginStatus', 'Manually refreshing session');
-        
-        const result = await apiCall('/refresh');
-        
-        // Update session manager
-        sessionManager.lastRefreshTime = new Date();
-        sessionManager.refreshCount++;
-        
-        showStatus('loginStatus', `Manual session refresh successful! Expires in ${result.expiresInMinutes} minutes`, 'success');
-        updateSessionStatus();
-        
-    } catch (error) {
-        console.error('Manual session refresh error:', error);
-        showStatus('loginStatus', `Manual session refresh failed: ${error.message}`, 'error');
-        sessionManager.sessionActive = false;
-        updateSessionStatus();
-    }
-};
-
-// Toggle auto-refresh functionality
-window.toggleAutoRefresh = function() {
-    if (sessionManager.refreshTimer) {
-        // Stop auto-refresh
-        clearInterval(sessionManager.refreshTimer);
-        sessionManager.refreshTimer = null;
-        showStatus('loginStatus', 'Auto-refresh stopped', 'info');
-        console.log('🛑 Auto-refresh disabled');
-    } else {
-        // Start auto-refresh
-        if (sessionManager.sessionActive) {
-            startSessionAutoRefresh();
-            showStatus('loginStatus', `Auto-refresh started (every ${sessionManager.refreshInterval / 60000} minutes)`, 'success');
-        } else {
-            showStatus('loginStatus', 'Cannot start auto-refresh: session inactive', 'error');
-        }
-    }
-    updateSessionStatus();
-};
-
 function displayUserInfo() {
     if (!userInfo) return;
 
     const userInfoSection = document.getElementById('userInfoSection');
     const userInfoDiv = document.getElementById('userInfo');
     
-    userInfoDiv.innerHTML = `
-        <p><strong>User ID:</strong> ${userInfo.id}</p>
-        <p><strong>Business:</strong> ${userInfo.bizName}</p>
-        <p><strong>Gender:</strong> ${userInfo.gender}</p>
-    `;
-    
-    userInfoSection.classList.remove('hidden');
+    userInfoSection.classList.remove('hidden')
 }
 
 // Restaurant search functionality
@@ -389,12 +221,7 @@ window.searchRestaurants = async function() {
     const searchQuery = document.getElementById('restaurantSearch').value;
 
     if (!searchQuery) {
-        showStatus('searchStatus', 'Please enter a restaurant name to search', 'error');
-        return;
-    }
-
-    if (!userInfo) {
-        showStatus('searchStatus', 'Please login first', 'error');
+        showStatus('searchStatus', '검색할 식당명을 입력하세요', 'error');
         return;
     }
 
@@ -408,17 +235,17 @@ window.searchRestaurants = async function() {
         restaurants = result.restaurants;
         
         if (restaurants.length === 0) {
-            showStatus('searchStatus', 'No restaurants found', 'info');
+            showStatus('searchStatus', '식당을 찾을 수 없습니다', 'info');
             document.getElementById('restaurantResults').innerHTML = '';
             return;
         }
 
-        showStatus('searchStatus', `Found ${restaurants.length} restaurant(s)`, 'success');
+        showStatus('searchStatus', `식당 ${restaurants.length}개를 찾았습니다`, 'success');
         displayRestaurants();
         
     } catch (error) {
-        console.error('Restaurant search error:', error);
-        showStatus('searchStatus', `Search failed: ${error.message}`, 'error');
+        console.error('식당 검색 오류:', error);
+        showStatus('searchStatus', `검색 실패: ${error.message}`, 'error');
     }
 };
 
@@ -428,20 +255,14 @@ function displayRestaurants() {
     const restaurantCards = restaurants.map((restaurant, index) => {
         const isSelected = selectedRestaurants.some(r => r.id === restaurant.id);
         return `
-        <div class="restaurant-card">
+        <label for="restaurant-${index}" class="restaurant-card">
             <div style="display: flex; align-items: center; margin-bottom: 10px;">
                 <input type="checkbox" id="restaurant-${index}" ${isSelected ? 'checked' : ''} 
                        onchange="toggleRestaurantSelection(${index})" style="margin-right: 10px; transform: scale(1.2);">
                 <h3 style="margin: 0;">${restaurant.name}</h3>
             </div>
-            <p><strong>ID:</strong> ${restaurant.id}</p>
-            <p><strong>Description:</strong> ${restaurant.description}</p>
-            <div style="margin-top: 15px;">
-                <button class="btn" onclick="registerRestaurant(${index})">Register</button>
-                <button class="btn" onclick="unregisterRestaurant(${index})">Unregister</button>
-                <button class="btn" onclick="checkRegistration(${index})">Check Registration</button>
-            </div>
-        </div>
+            <p>${restaurant.description.split('|').join(' > ')}</p>
+        </label>
     `;
     }).join('');
     
@@ -458,11 +279,11 @@ window.toggleRestaurantSelection = async function(index) {
     if (existingIndex >= 0) {
         // Remove from selection
         selectedRestaurants.splice(existingIndex, 1);
-        showStatus('searchStatus', `Removed ${restaurant.name} from selection`, 'info');
+        showStatus('searchStatus', `${restaurant.name}을 선택에서 제거함`, 'info');
     } else {
         // Add to selection
         selectedRestaurants.push(restaurant);
-        showStatus('searchStatus', `Added ${restaurant.name} to selection`, 'success');
+        showStatus('searchStatus', `${restaurant.name}을 선택에 추가함`, 'success');
         wasAdded = true;
     }
     
@@ -470,6 +291,7 @@ window.toggleRestaurantSelection = async function(index) {
     saveSelectedRestaurants();
     
     updateSelectedRestaurantsList();
+    updateTakeoutRestaurantDropdown();
     
     // Auto-fetch meal times when restaurants are selected
     if (selectedRestaurants.length > 0) {
@@ -495,15 +317,14 @@ function updateSelectedRestaurantsList() {
     const restaurantCards = selectedRestaurants.map((restaurant, index) => `
         <div class="restaurant-card">
             <h3>${restaurant.name}</h3>
-            <p><strong>ID:</strong> ${restaurant.id}</p>
-            <p><strong>Description:</strong> ${restaurant.description}</p>
-            <button class="btn" onclick="removeFromSelection('${restaurant.id}')">Remove from Selection</button>
+            <p>${restaurant.description.split('|').join(' > ')}</p>
+            <button class="btn" onclick="removeFromSelection('${restaurant.id}')">제거</button>
         </div>
     `).join('');
     
     listDiv.innerHTML = restaurantCards;
     
-    showStatus('selectedRestaurantsStatus', `${selectedRestaurants.length} restaurant(s) selected`, 'success');
+    showStatus('selectedRestaurantsStatus', `식당 ${selectedRestaurants.length}개 선택됨`, 'success');
 }
 
 // Update select dropdowns for meal operations
@@ -515,7 +336,7 @@ window.removeFromSelection = async function(restaurantId) {
     if (index >= 0) {
         const restaurant = selectedRestaurants[index];
         selectedRestaurants.splice(index, 1);
-        showStatus('selectedRestaurantsStatus', `Removed ${restaurant.name} from selection`, 'info');
+        showStatus('selectedRestaurantsStatus', `${restaurant.name}을 선택에서 제거함`, 'info');
         
         // Save to localStorage
         saveSelectedRestaurants();
@@ -523,6 +344,7 @@ window.removeFromSelection = async function(restaurantId) {
         // Update displays
         updateSelectedRestaurantsList();
         updateRestaurantSelects();
+        updateTakeoutRestaurantDropdown();
         displayRestaurants(); // Refresh to update checkboxes
         
         // Auto-fetch meal times for remaining restaurants
@@ -540,8 +362,9 @@ window.clearSelectedRestaurants = function() {
     
     updateSelectedRestaurantsList();
     updateMealTimeSelect();
+    updateTakeoutRestaurantDropdown();
     displayRestaurants(); // Refresh to update checkboxes
-    showStatus('selectedRestaurantsStatus', 'All selections cleared', 'info');
+    showStatus('selectedRestaurantsStatus', '모든 선택이 취소되었습니다', 'info');
 };
 
 // Auto-fetch meal times from all selected restaurants
@@ -641,10 +464,10 @@ window.registerRestaurant = async function(index) {
         await apiCall('/restaurants/register', {
             restaurantData: restaurant
         });
-        showStatus('searchStatus', `Successfully registered ${restaurant.name}`, 'success');
+        showStatus('searchStatus', `${restaurant.name} 등록 성공`, 'success');
     } catch (error) {
         console.error('Registration error:', error);
-        showStatus('searchStatus', `Registration failed: ${error.message}`, 'error');
+        showStatus('searchStatus', `등록 실패: ${error.message}`, 'error');
     }
 };
 
@@ -656,10 +479,10 @@ window.unregisterRestaurant = async function(index) {
         await apiCall('/restaurants/unregister', {
             restaurantData: restaurant
         });
-        showStatus('searchStatus', `Successfully unregistered ${restaurant.name}`, 'success');
+        showStatus('searchStatus', `${restaurant.name} 등록 취소 성공`, 'success');
     } catch (error) {
         console.error('Unregistration error:', error);
-        showStatus('searchStatus', `Unregistration failed: ${error.message}`, 'error');
+        showStatus('searchStatus', `등록 취소 실패: ${error.message}`, 'error');
     }
 };
 
@@ -671,11 +494,11 @@ window.checkRegistration = async function(index) {
         const result = await apiCall('/restaurants/check-registration', {
             restaurantId: restaurant.id
         });
-        const status = result.isRegistered ? 'registered' : 'not registered';
-        showStatus('searchStatus', `${restaurant.name} is ${status}`, 'info');
+        const status = result.isRegistered ? '등록됨' : '등록되지 않음';
+        showStatus('searchStatus', `${restaurant.name}은 ${status}`, 'info');
     } catch (error) {
         console.error('Registration check error:', error);
-        showStatus('searchStatus', `Registration check failed: ${error.message}`, 'error');
+        showStatus('searchStatus', `등록 확인 실패: ${error.message}`, 'error');
     }
 };
 
@@ -696,11 +519,10 @@ function displayMealTimes() {
 
 function updateMealTimeSelect() {
     const takeinSelect = document.getElementById('takeinMealTimeId');
-    const takeoutSelect = document.getElementById('takeoutMealTimeId');
     
     // Only update if we have meal times or if selects are empty
     if (allMealTimes.length > 0 || (takeinSelect && takeinSelect.children.length <= 1)) {
-        const optionsHTML = '<option value="">Select a meal time</option>' + 
+        const optionsHTML = '<option value="">식사 시간 선택</option>' + 
             allMealTimes.map(mealTime => 
                 `<option value="${mealTime.id}">${mealTime.name}</option>`
             ).join('');
@@ -713,15 +535,162 @@ function updateMealTimeSelect() {
                 takeinSelect.value = currentValue;
             }
         }
-        
-        if (takeoutSelect) {
-            // Preserve current selection if possible
-            const currentValue = takeoutSelect.value;
-            takeoutSelect.innerHTML = optionsHTML;
-            if (currentValue && allMealTimes.some(mt => mt.id === currentValue)) {
-                takeoutSelect.value = currentValue;
-            }
+    }
+}
+
+// Update take-out restaurant dropdown
+function updateTakeoutRestaurantDropdown() {
+    const takeoutSelect = document.getElementById('takeoutRestaurantSelect');
+    if (!takeoutSelect) return;
+    
+    const currentValue = takeoutSelect.value;
+    const optionsHTML = '<option value="">테이크 아웃 식당을 선택하세요</option>' + 
+        selectedRestaurants.map((restaurant, index) => 
+            `<option value="${index}">${restaurant.name}</option>`
+        ).join('');
+    
+    takeoutSelect.innerHTML = optionsHTML;
+    
+    // If we had a previously selected restaurant and it's still in the list, restore selection
+    if (selectedTakeoutRestaurant && currentValue) {
+        const matchingIndex = selectedRestaurants.findIndex(r => r.id === selectedTakeoutRestaurant.id);
+        if (matchingIndex >= 0) {
+            takeoutSelect.value = matchingIndex;
+        } else {
+            // Previously selected restaurant is no longer available
+            selectedTakeoutRestaurant = null;
+            saveTakeoutRestaurant();
+            updateTakeoutRestaurantDisplay();
         }
+    }
+}
+
+// Update take-out meal time dropdown (separate from regular meal times)
+function updateTakeoutMealTimeSelect() {
+    const takeoutMealTimeSelect = document.getElementById('takeoutMealTimeId');
+    if (!takeoutMealTimeSelect) return;
+    
+    if (takeoutMealTimes.length > 0) {
+        const optionsHTML = '<option value="">Select meal time</option>' + 
+            takeoutMealTimes.map(mealTime => 
+                `<option value="${mealTime.id}">${mealTime.name}</option>`
+            ).join('');
+        
+        const currentValue = takeoutMealTimeSelect.value;
+        takeoutMealTimeSelect.innerHTML = optionsHTML;
+        if (currentValue && takeoutMealTimes.some(mt => mt.id === currentValue)) {
+            takeoutMealTimeSelect.value = currentValue;
+        }
+    } else {
+        takeoutMealTimeSelect.innerHTML = '<option value="">Select meal time</option>';
+    }
+}
+
+// Take-out restaurant selection event handlers
+window.onTakeoutRestaurantChange = async function() {
+    const selectElement = document.getElementById('takeoutRestaurantSelect');
+    const selectedIndex = selectElement.value;
+    
+    if (!selectedIndex) {
+        selectedTakeoutRestaurant = null;
+        takeoutMealTimes = [];
+        saveTakeoutRestaurant();
+        updateTakeoutRestaurantDisplay();
+        updateTakeoutMealTimeSelect();
+        return;
+    }
+    
+    const restaurant = selectedRestaurants[parseInt(selectedIndex)];
+    selectedTakeoutRestaurant = restaurant;
+    saveTakeoutRestaurant();
+    
+    updateTakeoutRestaurantDisplay();
+    
+    // Fetch meal times for the selected take-out restaurant
+    await fetchTakeoutMealTimes();
+    getTakeoutMeals()
+};
+
+window.clearTakeoutRestaurant = function() {
+    selectedTakeoutRestaurant = null;
+    takeoutMealTimes = [];
+    saveTakeoutRestaurant();
+    
+    const selectElement = document.getElementById('takeoutRestaurantSelect');
+    if (selectElement) {
+        selectElement.value = '';
+    }
+    
+    updateTakeoutRestaurantDisplay();
+    updateTakeoutMealTimeSelect();
+    showStatus('takeoutRestaurantStatus', 'Take-out restaurant selection cleared', 'info');
+    
+    // Clear any displayed take-out meals
+    const resultsDiv = document.getElementById('takeoutMealsResults');
+    if (resultsDiv) {
+        resultsDiv.innerHTML = '';
+    }
+    showStatus('takeoutMealsStatus', '', '');
+};
+
+// Display selected take-out restaurant
+function updateTakeoutRestaurantDisplay() {
+    const displayDiv = document.getElementById('takeoutSelectedRestaurant');
+    if (!displayDiv) return;
+    
+    if (!selectedTakeoutRestaurant) {
+        displayDiv.innerHTML = '<p>테이크 아웃 식당이 선택되지 않았습니다. 위에서 사용 가능한 식당을 선택하세요.</p>';
+        return;
+    }
+    
+    displayDiv.innerHTML = `
+        <div class="restaurant-card">
+            <h3>📦 Selected for Take-Out: ${selectedTakeoutRestaurant.name}</h3>
+            <p><strong>ID:</strong> ${selectedTakeoutRestaurant.id}</p>
+            <p><strong>Description:</strong> ${selectedTakeoutRestaurant.description}</p>
+        </div>
+    `;
+}
+
+// Fetch meal times for the selected take-out restaurant
+async function fetchTakeoutMealTimes() {
+    if (!selectedTakeoutRestaurant) {
+        takeoutMealTimes = [];
+        updateTakeoutMealTimeSelect();
+        return;
+    }
+    
+    try {
+        console.log(`🔄 Fetching meal times for take-out restaurant: ${selectedTakeoutRestaurant.name}`);
+        
+        const result = await apiCall('/restaurants/meal-times', {
+            restaurantData: selectedTakeoutRestaurant
+        });
+        
+        if (result.success && result.mealTimes && result.mealTimes.length > 0) {
+            takeoutMealTimes = result.mealTimes;
+            updateTakeoutMealTimeSelect();
+            
+            // Set default meal time
+            const defaultMealTime = getDefaultMealTime(takeoutMealTimes);
+            if (defaultMealTime) {
+                const takeoutMealTimeSelect = document.getElementById('takeoutMealTimeId');
+                if (takeoutMealTimeSelect) {
+                    takeoutMealTimeSelect.value = defaultMealTime.id;
+                }
+            }
+            
+            console.log(`✅ Fetched ${result.mealTimes.length} meal times for take-out restaurant`);
+        } else {
+            takeoutMealTimes = [];
+            updateTakeoutMealTimeSelect();
+            console.warn(`⚠️  No meal times returned from take-out restaurant ${selectedTakeoutRestaurant.name}`);
+        }
+        
+    } catch (error) {
+        console.error(`❌ Failed to get meal times for take-out restaurant ${selectedTakeoutRestaurant.name}:`, error.message);
+        takeoutMealTimes = [];
+        updateTakeoutMealTimeSelect();
     }
 }
 
@@ -801,15 +770,25 @@ async function fetchMeals(dateStr, mealTimeId, mealType = 'all', statusElementId
         // Filter meals based on type
         let filteredMeals = allMeals;
         if (mealType === 'takein') {
-            // Take In: exclude meals with "T/O" prefix in course name
-            filteredMeals = allMeals.filter(meal => 
-                !meal.menuCourseName || !meal.menuCourseName.startsWith('T/O')
-            );
+            // Take In: exclude meals with "T/O" prefix in course name, BUT include meals with "도시락" in name
+            filteredMeals = allMeals.filter(meal => {
+                // If meal name contains "도시락", it's always Take In
+                if (meal.name && meal.name.includes('도시락')) {
+                    return true;
+                }
+                // Otherwise, exclude T/O meals
+                return !meal.menuCourseName || !meal.menuCourseName.startsWith('T/O');
+            });
         } else if (mealType === 'takeout') {
-            // Take Out: only include meals with "T/O" prefix in course name
-            filteredMeals = allMeals.filter(meal => 
-                meal.menuCourseName && meal.menuCourseName.startsWith('T/O')
-            );
+            // Take Out: only include meals with "T/O" prefix in course name, BUT exclude meals with "도시락" in name
+            filteredMeals = allMeals.filter(meal => {
+                // If meal name contains "도시락", it's never Take Out (always Take In)
+                if (meal.name && meal.name.includes('도시락')) {
+                    return false;
+                }
+                // Otherwise, only include T/O meals
+                return meal.menuCourseName && meal.menuCourseName.startsWith('T/O');
+            });
         }
         
         const typeText = mealType === 'takein' ? 'Take In' : mealType === 'takeout' ? 'Take Out' : '';
@@ -835,15 +814,73 @@ window.getTakeinMeals = async function() {
     const dateStr = document.getElementById('takeinMealDate').value;
     const mealTimeId = document.getElementById('takeinMealTimeId').value;
     
-    await fetchMeals(dateStr, mealTimeId, 'takein', 'takeinMealsStatus', 'takeinMealsResults');
+    // Convert date from YYYY-MM-DD to YYYYMMDD format if needed
+    const formattedDate = dateStr.includes('-') ? dateStr.replace(/-/g, '') : dateStr;
+    
+    await fetchMeals(formattedDate, mealTimeId, 'takein', 'takeinMealsStatus', 'takeinMealsResults');
 };
 
-// Take Out Meals functionality
+// Take Out Meals functionality  
 window.getTakeoutMeals = async function() {
     const dateStr = document.getElementById('takeoutMealDate').value;
     const mealTimeId = document.getElementById('takeoutMealTimeId').value;
     
-    await fetchMeals(dateStr, mealTimeId, 'takeout', 'takeoutMealsStatus', 'takeoutMealsResults');
+    // Convert date from YYYY-MM-DD to YYYYMMDD format if needed
+    const formattedDate = dateStr.includes('-') ? dateStr.replace(/-/g, '') : dateStr;
+    
+    if (!formattedDate || !/^\d{8}$/.test(formattedDate)) {
+        showStatus('takeoutMealsStatus', 'YYYYMMDD 형식의 유효한 날짜를 입력하세요', 'error');
+        return;
+    }
+    
+    if (!mealTimeId) {
+        showStatus('takeoutMealsStatus', '식사 시간을 선택하세요', 'error');
+        return;
+    }
+
+    if (!selectedTakeoutRestaurant) {
+        showStatus('takeoutMealsStatus', '먼저 테이크 아웃 식당을 선택하세요', 'error');
+        return;
+    }
+
+    try {
+        showLoading('takeoutMealsStatus', 'Getting Take Out meals');
+        
+        const result = await apiCall('/restaurants/meals', {
+            restaurantData: selectedTakeoutRestaurant,
+            date: formattedDate,
+            mealTimeId: mealTimeId
+        });
+        
+        // Add restaurant info to each meal for identification
+        const mealsWithRestaurant = result.meals.map(meal => ({
+            ...meal,
+            restaurantName: selectedTakeoutRestaurant.name
+        }));
+        
+        // Filter meals for take-out: only include meals with "T/O" prefix in course name, BUT exclude meals with "도시락" in name
+        const filteredMeals = mealsWithRestaurant.filter(meal => {
+            // If meal name contains "도시락", it's never Take Out (always Take In)
+            if (meal.name && meal.name.includes('도시락')) {
+                return false;
+            }
+            // Otherwise, only include T/O meals
+            return meal.menuCourseName && meal.menuCourseName.startsWith('T/O');
+        });
+        
+        if (filteredMeals.length === 0) {
+            showStatus('takeoutMealsStatus', `선택된 조건에 맞는 테이크 아웃 메뉴를 찾을 수 없습니다`, 'info');
+            document.getElementById('takeoutMealsResults').innerHTML = '<p>테이크 아웃 메뉴를 찾을 수 없습니다.</p>';
+            return;
+        }
+        
+        showStatus('takeoutMealsStatus', `${selectedTakeoutRestaurant.name}에서 테이크 아웃 메뉴 ${filteredMeals.length}개를 찾았습니다`, 'success');
+        displayMeals(filteredMeals, 'takeoutMealsResults');
+        
+    } catch (error) {
+        console.error('Take-out meals error:', error);
+        showStatus('takeoutMealsStatus', `테이크 아웃 메뉴 가져오기 실패: ${error.message}`, 'error');
+    }
 };
 
 // Fetch menu items for multiple meals
@@ -1048,16 +1085,11 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                         <th>Restaurant</th>
                         <th>Meal</th>
                         <th>Menu Item</th>
-                        <th>Course</th>
-                        <th>Type</th>
-                        <th>Set</th>
-                        <th>Hall</th>
-                        <th class="nutrition-header">Calories</th>
-                        <th class="nutrition-header">Carbs (g)</th>
-                        <th class="nutrition-header">Sugar (g)</th>
-                        <th class="nutrition-header">Fiber (g)</th>
-                        <th class="nutrition-header">Fat (g)</th>
-                        <th class="nutrition-header">Protein (g)</th>
+                        <th class="nutrition-header calories">칼로리</th>
+                        <th class="nutrition-header carbs">탄수화물</th>
+                        <th class="nutrition-header sugar">당</th>
+                        <th class="nutrition-header fat">지방</th>
+                        <th class="nutrition-header protein">단백질</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1072,18 +1104,13 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                                 <strong>${item.mealName}</strong>
                             </td>
                             <td>
-                                <strong>${item.name}</strong>
+                                <strong>[${item.setName || '-'}] ${item.name}</strong>
                             </td>
-                            <td>${item.menuCourseName}</td>
-                            <td>${item.menuCourseType}</td>
-                            <td>${item.setName || '-'}</td>
-                            <td>${item.hallNo}</td>
-                            <td class="nutrition-col nutrition-calories">${item.calorie || 0}</td>
-                            <td class="nutrition-col nutrition-carbs">${item.carbohydrate || 0}</td>
-                            <td class="nutrition-col nutrition-sugar">${item.sugar || 0}</td>
-                            <td class="nutrition-col nutrition-fiber">${item.fiber || 0}</td>
-                            <td class="nutrition-col nutrition-fat">${item.fat || 0}</td>
-                            <td class="nutrition-col nutrition-protein">${item.protein || 0}</td>
+                            <td class="nutrition-col nutrition-calories">${Math.floor((item.calorie || 0)*100)/100} kcal</td>
+                            <td class="nutrition-col nutrition-carbs">${Math.floor((item.carbohydrate || 0)*100)/100}g</td>
+                            <td class="nutrition-col nutrition-sugar">${Math.floor((item.sugar || 0)*100)/100}g</td>
+                            <td class="nutrition-col nutrition-fat">${Math.floor((item.fat || 0)*100)/100}g</td>
+                            <td class="nutrition-col nutrition-protein">${Math.floor((item.protein || 0)*100)/100}g</td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -1093,12 +1120,11 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
     } else {
         // Take-in meals or default: Show table view with nutrition
         const nutritionColumns = isTakeInMeals ? `
-            <th class="nutrition-header">Calories</th>
-            <th class="nutrition-header">Carbs (g)</th>
-            <th class="nutrition-header">Sugar (g)</th>
-            <th class="nutrition-header">Fiber (g)</th>
-            <th class="nutrition-header">Fat (g)</th>
-            <th class="nutrition-header">Protein (g)</th>
+            <th class="nutrition-header calories">칼로리</th>
+            <th class="nutrition-header carbs">탄수화물</th>
+            <th class="nutrition-header sugar">당</th>
+            <th class="nutrition-header fat">지방</th>
+            <th class="nutrition-header protein">단백질</th>
         ` : '';
         
         tableHTML = `
@@ -1106,28 +1132,57 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                 <thead>
                     <tr>
                         <th>Restaurant</th>
-                        <th>Meal Name</th>
-                        <th>Course</th>
-                        <th>Type</th>
-                        <th>Set</th>
-                        <th>Hall</th>
                         <th>Image</th>
+                        <th>Meal Name</th>
                         ${nutritionColumns}
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${processedMeals.map((meal, index) => {
-                        const nutritionCells = isTakeInMeals && meal.nutritionTotals ? `
-                            <td class="nutrition-col nutrition-calories">${meal.nutritionTotals.calories || 0}</td>
-                            <td class="nutrition-col nutrition-carbs">${meal.nutritionTotals.carbs || 0}</td>
-                            <td class="nutrition-col nutrition-sugar">${meal.nutritionTotals.sugar || 0}</td>
-                            <td class="nutrition-col nutrition-fiber">${meal.nutritionTotals.fiber || 0}</td>
-                            <td class="nutrition-col nutrition-fat">${meal.nutritionTotals.fat || 0}</td>
-                            <td class="nutrition-col nutrition-protein">${meal.nutritionTotals.protein || 0}</td>
-                        ` : isTakeInMeals ? `
-                            <td colspan="6" class="nutrition-loading">Nutrition data unavailable</td>
-                        ` : '';
+                        let nutritionCells = '';
+                        if (isTakeInMeals && meal.nutritionTotals) {
+                            // Check filtering options for Take In meals
+                            const isTakeinResults = resultsElementId === 'takeinMealsResults';
+                            const filterMainOnly = isTakeinResults && document.getElementById('takeinFilterMainOnly')?.checked;
+                            const filterExcludeOptional = isTakeinResults && document.getElementById('takeinFilterExcludeOptional')?.checked;
+                            
+                            let nutritionTotals = meal.nutritionTotals;
+                            if ((filterMainOnly || filterExcludeOptional) && meal.nutritionData) {
+                                // Apply filters to nutrition items
+                                let filteredItems = meal.nutritionData;
+                                
+                                if (filterMainOnly) {
+                                    filteredItems = filteredItems.filter(item => item.isMain);
+                                }
+                                
+                                if (filterExcludeOptional) {
+                                    filteredItems = filteredItems.filter(item => 
+                                        !item.name?.includes('추가찬') && !item.name?.includes('택1')
+                                    );
+                                }
+                                
+                                // Recalculate totals with filtered items
+                                nutritionTotals = {
+                                    calories: filteredItems.reduce((sum, item) => sum + (item.calorie || 0), 0),
+                                    carbs: filteredItems.reduce((sum, item) => sum + (item.carbohydrate || 0), 0),
+                                    sugar: filteredItems.reduce((sum, item) => sum + (item.sugar || 0), 0),
+                                    fiber: filteredItems.reduce((sum, item) => sum + (item.fiber || 0), 0),
+                                    fat: filteredItems.reduce((sum, item) => sum + (item.fat || 0), 0),
+                                    protein: filteredItems.reduce((sum, item) => sum + (item.protein || 0), 0)
+                                };
+                            }
+                            
+                            nutritionCells = `
+                                <td class="nutrition-col nutrition-calories">${Math.floor((nutritionTotals.calories || 0)*100)/100} kcal</td>
+                                <td class="nutrition-col nutrition-carbs">${Math.floor((nutritionTotals.carbs || 0)*100)/100}g</td>
+                                <td class="nutrition-col nutrition-sugar">${Math.floor((nutritionTotals.sugar || 0)*100)/100}g</td>
+                                <td class="nutrition-col nutrition-fat">${Math.floor((nutritionTotals.fat || 0)*100)/100}g</td>
+                                <td class="nutrition-col nutrition-protein">${Math.floor((nutritionTotals.protein || 0)*100)/100}g</td>
+                            `;
+                        } else if (isTakeInMeals) {
+                            nutritionCells = `<td colspan="6" class="nutrition-loading">Nutrition data unavailable</td>`;
+                        }
                         
                         return `
                         <tr>
@@ -1136,16 +1191,12 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                                     📍 ${meal.restaurantName || 'Unknown'}
                                 </span>
                             </td>
-                            <td>
-                                <strong>${meal.name}</strong>
-                                ${meal.subMenuTxt ? `<br><small class="meal-description">${meal.subMenuTxt}</small>` : ''}
-                            </td>
-                            <td>${meal.menuCourseName}</td>
-                            <td>${meal.menuCourseType}</td>
-                            <td>${meal.setName || '-'}</td>
-                            <td>${meal.hallNo}</td>
                             <td class="meal-image-cell">
                                 ${meal.photoUrl ? `<img class="meal-image-thumb" src="${meal.photoUrl}" alt="${meal.name}" onerror="this.style.display='none'" onclick="showImageModal('${meal.photoUrl}', '${meal.name}')">` : '-'}
+                            </td>
+                            <td>
+                                [${meal.menuCourseName}] <strong>${meal.name}</strong>
+                                ${meal.subMenuTxt ? `<br><small class="meal-description">${meal.subMenuTxt}</small>` : ''}
                             </td>
                             ${nutritionCells}
                             <td>
@@ -1196,41 +1247,136 @@ window.showImageModal = function(imageUrl, mealName) {
     document.body.appendChild(modal);
 };
 
+// Nutrition modal function
+window.showNutritionModal = function(mealName, nutritionData, errorMessage = null) {
+    const modal = document.createElement('div');
+    modal.className = 'image-modal';
+    
+    // Check filtering options for Take In meals
+    const filterMainOnly = document.getElementById('takeinFilterMainOnly')?.checked;
+    const filterExcludeOptional = document.getElementById('takeinFilterExcludeOptional')?.checked;
+    let filteredData = nutritionData;
+    
+    if ((filterMainOnly || filterExcludeOptional) && nutritionData && Array.isArray(nutritionData)) {
+        if (filterMainOnly) {
+            filteredData = filteredData.filter(item => item.isMain);
+        }
+        
+        if (filterExcludeOptional) {
+            filteredData = filteredData.filter(item => 
+                !item.name?.includes('추가찬') && !item.name?.includes('택1')
+            );
+        }
+        
+        const filterTypes = [];
+        if (filterMainOnly) filterTypes.push('main courses only');
+        if (filterExcludeOptional) filterTypes.push('excluding optional items');
+        console.log(`🎯 Filtering nutrition modal: ${filteredData.length}/${nutritionData.length} items (${filterTypes.join(', ')})`);
+    }
+    
+    let content = '';
+    if (errorMessage) {
+        content = `<p style="color: #ef4444; text-align: center; padding: 20px;">Error: ${errorMessage}</p>`;
+    } else if (filteredData.length === 0) {
+        let emptyMessage = 'No nutritional information available';
+        if (filterMainOnly || filterExcludeOptional) {
+            const filterTypes = [];
+            if (filterMainOnly) filterTypes.push('main courses');
+            if (filterExcludeOptional) filterTypes.push('non-optional items');
+            emptyMessage = `No items found after filtering (${filterTypes.join(' and ')})`;
+        }
+        content = `<p style="text-align: center; padding: 20px; color: #6b7280;">${emptyMessage}</p>`;
+    } else {
+        content = `
+            <div style="max-height: 70vh; overflow-y: auto;">
+                <table class="nutrition-table" style="width: 100%; font-size: 14px;">
+                    <thead>
+                        <tr>
+                            <th>Menu Item</th>
+                            <th>Main Course</th>
+                            <th class="nutrition-header calories">Calories</th>
+                            <th class="nutrition-header carbs">Carbs (g)</th>
+                            <th class="nutrition-header sugar">Sugar (g)</th>
+                            <th class="nutrition-header fiber">Fiber (g)</th>
+                            <th class="nutrition-header fat">Fat (g)</th>
+                            <th class="nutrition-header protein">Protein (g)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredData.map(item => `
+                            <tr>
+                                <td style="font-weight: 500;">${item.name}</td>
+                                <td>${item.isMain ? '<span class="main-course-badge">Yes</span>' : 'No'}</td>
+                                <td class="nutrition-calories" style="text-align: center; font-weight: bold;">${(item.calorie || 0).toFixed(2)}</td>
+                                <td class="nutrition-carbs" style="text-align: center; font-weight: bold;">${(item.carbohydrate || 0).toFixed(2)}</td>
+                                <td class="nutrition-sugar" style="text-align: center; font-weight: bold;">${(item.sugar || 0).toFixed(2)}</td>
+                                <td class="nutrition-fiber" style="text-align: center; font-weight: bold;">${(item.fiber || 0).toFixed(2)}</td>
+                                <td class="nutrition-fat" style="text-align: center; font-weight: bold;">${(item.fat || 0).toFixed(2)}</td>
+                                <td class="nutrition-protein" style="text-align: center; font-weight: bold;">${(item.protein || 0).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; background: #f9fafb; border-top: 2px solid #6b7280;">
+                            <td style="font-weight: bold;">TOTAL</td>
+                            <td>-</td>
+                            <td class="nutrition-calories" style="text-align: center; font-weight: bold;">${filteredData.reduce((sum, item) => sum + (item.calorie || 0), 0).toFixed(2)}</td>
+                            <td class="nutrition-carbs" style="text-align: center; font-weight: bold;">${filteredData.reduce((sum, item) => sum + (item.carbohydrate || 0), 0).toFixed(2)}</td>
+                            <td class="nutrition-sugar" style="text-align: center; font-weight: bold;">${filteredData.reduce((sum, item) => sum + (item.sugar || 0), 0).toFixed(2)}</td>
+                            <td class="nutrition-fiber" style="text-align: center; font-weight: bold;">${filteredData.reduce((sum, item) => sum + (item.fiber || 0), 0).toFixed(2)}</td>
+                            <td class="nutrition-fat" style="text-align: center; font-weight: bold;">${filteredData.reduce((sum, item) => sum + (item.fat || 0), 0).toFixed(2)}</td>
+                            <td class="nutrition-protein" style="text-align: center; font-weight: bold;">${filteredData.reduce((sum, item) => sum + (item.protein || 0), 0).toFixed(2)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+    }
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 90%; max-height: 90%; min-width: 800px;">
+            <span class="modal-close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+            <h3 style="margin-bottom: 20px; text-align: center;">📊 Nutritional Information - ${mealName}</h3>
+            ${content}
+        </div>
+    `;
+    
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+    
+    document.body.appendChild(modal);
+};
+
 // Nutrition functionality
 window.getNutritionInfo = async function(mealIndex) {
     const meal = window.currentMeals[mealIndex];
     
-    // Determine which tab we're in based on the current results area
-    let nutritionStatusId = 'nutritionStatus';
-    let nutritionResultsId = 'nutritionResults';
-    
-    if (window.currentMealsResultsId === 'takeinMealsResults') {
-        nutritionStatusId = 'takeinNutritionStatus';
-        nutritionResultsId = 'takeinNutritionResults';
-    } else if (window.currentMealsResultsId === 'takeoutMealsResults') {
-        nutritionStatusId = 'takeoutNutritionStatus';
-        nutritionResultsId = 'takeoutNutritionResults';
+    // First, check if we already have processed nutrition data
+    if (meal.nutritionData && meal.nutritionData.length > 0) {
+        console.log('📊 Using existing nutrition data from backend');
+        showNutritionModal(meal.name || meal.mealName || 'Unknown Meal', meal.nutritionData);
+        return;
     }
     
     try {
-        showLoading(nutritionStatusId, 'Getting nutritional information');
-        
         const result = await apiCall('/meals/nutrition', {
             mealData: meal
         });
         
         if (result.nutritionData.length === 0) {
-            showStatus(nutritionStatusId, 'No nutritional information available', 'info');
-            document.getElementById(nutritionResultsId).innerHTML = '';
+            showNutritionModal(result.mealName, []);
             return;
         }
 
-        showStatus(nutritionStatusId, `Found nutrition data for ${result.nutritionData.length} menu item(s)`, 'success');
-        displayNutritionInfo(result.mealName, result.nutritionData, nutritionResultsId);
+        // Backend already processed main course detection
+        showNutritionModal(result.mealName, result.nutritionData);
         
     } catch (error) {
         console.error('Nutrition error:', error);
-        showStatus(nutritionStatusId, `Failed to get nutrition info: ${error.message}`, 'error');
+        showNutritionModal(meal.mealName || 'Unknown Meal', [], error.message);
     }
 };
 
@@ -1403,7 +1549,7 @@ window.switchTab = function(tabName, clickedElement = null) {
     });
     
     // Remove active class from all tab buttons
-    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabButtons = document.querySelectorAll('.header-tab-btn');
     tabButtons.forEach(button => {
         button.classList.remove('active');
     });
@@ -1444,15 +1590,21 @@ window.switchTab = function(tabName, clickedElement = null) {
             }
         }
     } else if (tabName === 'takeout') {
+        // Update take-out restaurant dropdown and display
+        updateTakeoutRestaurantDropdown();
+        updateTakeoutRestaurantDisplay();
+        
         if (selectedRestaurants.length === 0) {
             showStatus('takeoutMealsStatus', 'Please select restaurants first in the Restaurant Selection tab', 'info');
+        } else if (!selectedTakeoutRestaurant) {
+            showStatus('takeoutMealsStatus', 'Please select a restaurant for take-out', 'info');
         } else {
-            // Automatically fetch meals if we have restaurants selected and required fields
+            // Automatically fetch meals if we have take-out restaurant selected and required fields
             const mealDate = document.getElementById('takeoutMealDate').value;
             const mealTimeId = document.getElementById('takeoutMealTimeId').value;
             
             if (mealDate && mealTimeId) {
-                console.log('📦 Auto-fetching Take Out meals for selected restaurants...');
+                console.log('📦 Auto-fetching Take Out meals for selected take-out restaurant...');
                 getTakeoutMeals();
             } else if (!mealDate) {
                 showStatus('takeoutMealsStatus', 'Please enter a date to view meals', 'info');
@@ -1476,7 +1628,7 @@ window.onTakeinMealDateChange = function() {
         console.log('🍴 Auto-fetching Take In meals due to date change...');
         getTakeinMeals();
     }
-}
+};
 
 // Handle Take In meal time selection change
 window.onTakeinMealTimeChange = function() {
@@ -1493,16 +1645,24 @@ window.onTakeinMealTimeChange = function() {
     }
 }
 
+// Handle Take In filter change
+window.onTakeinFilterChange = function() {
+    // Re-display the current meals with the new filter
+    if (window.currentMeals && window.currentMeals.length > 0) {
+        displayMeals(window.currentMeals, 'takeinMealsResults');
+    }
+};
+
 // Handle Take Out meal date change
 window.onTakeoutMealDateChange = function() {
     const mealDate = document.getElementById('takeoutMealDate').value;
     const mealTimeId = document.getElementById('takeoutMealTimeId').value;
     
-    // Only auto-fetch if we're on the takeout tab, have selected restaurants, date, and meal time
+    // Only auto-fetch if we're on the takeout tab, have selected take-out restaurant, date, and meal time
     const takeoutTab = document.getElementById('takeout-tab');
     const isTakeoutTabActive = takeoutTab && takeoutTab.classList.contains('active');
     
-    if (isTakeoutTabActive && selectedRestaurants.length > 0 && mealDate && mealTimeId) {
+    if (isTakeoutTabActive && selectedTakeoutRestaurant && mealDate && mealTimeId) {
         console.log('📦 Auto-fetching Take Out meals due to date change...');
         getTakeoutMeals();
     }
@@ -1513,11 +1673,11 @@ window.onTakeoutMealTimeChange = function() {
     const mealDate = document.getElementById('takeoutMealDate').value;
     const mealTimeId = document.getElementById('takeoutMealTimeId').value;
     
-    // Only auto-fetch if we're on the takeout tab, have selected restaurants, date, and meal time
+    // Only auto-fetch if we're on the takeout tab, have selected take-out restaurant, date, and meal time
     const takeoutTab = document.getElementById('takeout-tab');
     const isTakeoutTabActive = takeoutTab && takeoutTab.classList.contains('active');
     
-    if (isTakeoutTabActive && selectedRestaurants.length > 0 && mealDate && mealTimeId) {
+    if (isTakeoutTabActive && selectedTakeoutRestaurant && mealDate && mealTimeId) {
         console.log('📦 Auto-fetching Take Out meals due to meal time change...');
         getTakeoutMeals();
     }
@@ -1607,3 +1767,24 @@ function makeTableSortable(tableElement, tableId) {
         });
     });
 }
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', function() {
+    // Load any saved restaurant selections
+    loadSelectedRestaurants();
+    loadTakeoutRestaurant();
+    updateSelectedRestaurantsList();
+    updateTakeoutRestaurantDropdown();
+    updateTakeoutRestaurantDisplay();
+    
+    // Auto-authenticate and start session management
+    autoAuthenticate().then(() => {
+        startSessionAutoRefresh();
+        startStatusUpdater();
+    });
+    
+    // Set default dates to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('takeinMealDate').value = today;
+    document.getElementById('takeoutMealDate').value = today;
+});

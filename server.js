@@ -25,6 +25,44 @@ function getCacheKey(prefix, ...args) {
     return `${prefix}_${crypto.createHash('md5').update(data).digest('hex')}`;
 }
 
+// Main course detection utility
+function processMainCourseDetection(nutritionData, mealSetName) {
+    if (!nutritionData || !Array.isArray(nutritionData) || !mealSetName) {
+        console.log(`⚠️ Skipping main course detection - nutritionData: ${!!nutritionData}, array: ${Array.isArray(nutritionData)}, setName: "${mealSetName}"`);
+        return nutritionData;
+    }
+    
+    console.log(`🔍 Processing main course detection for setName: "${mealSetName}"`);
+    
+    return nutritionData.map(item => {
+        // Consider item as main course if setName includes the menu item name
+        let isMainBySet = false;
+        if (item.name && mealSetName) {
+            const setNameLower = mealSetName.toLowerCase();
+            const itemNameLower = item.name.toLowerCase();
+            
+            // Check if setName contains item name or vice versa
+            isMainBySet = setNameLower.includes(itemNameLower) || 
+                         itemNameLower.includes(setNameLower);
+            
+            // Debug logging for all items
+            console.log(`  📋 Item: "${item.name}" | setName: "${mealSetName}" | isMainBySet: ${isMainBySet} | originalIsMain: ${item.isMain}`);
+            
+            // Additional debug logging for matches
+            if (isMainBySet) {
+                console.log(`🍽️ Main course detected: "${item.name}" in setName "${mealSetName}"`);
+            }
+        } else {
+            console.log(`  ⚠️ Skipping item - itemName: "${item.name}", setName: "${mealSetName}"`);
+        }
+        
+        return {
+            ...item,
+            isMain: item.isMain || isMainBySet
+        };
+    });
+}
+
 function getCachePath(key) {
     return path.join(CACHE_DIR, `${key}.json`);
 }
@@ -91,25 +129,16 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.'));
+app.use(express.static('public'));
 
-// Store active clients (in production, use Redis or database)
-const clients = new Map();
 
 // Store user info globally
 let globalUserInfo = null;
+const client = new WelstoryClient({
+    automaticTokenRefresh: process.env.WELSTORY_AUTO_REFRESH !== 'false',
+    baseUrl: process.env.WELSTORY_BASE_URL
+})
 
-// Helper function to get client
-function getClient(sessionId) {
-    if (!clients.has(sessionId)) {
-        const client = new WelstoryClient({
-            automaticTokenRefresh: process.env.WELSTORY_AUTO_REFRESH !== 'false',
-            baseUrl: process.env.WELSTORY_BASE_URL
-        });
-        clients.set(sessionId, client);
-    }
-    return clients.get(sessionId);
-}
 
 // Auto-login function
 async function autoLogin() {
@@ -123,8 +152,6 @@ async function autoLogin() {
     
     try {
         console.log('🔐 Auto-logging in with configured credentials...');
-        const client = getClient('default');
-        
         globalUserInfo = await client.login({
             username,
             password,
@@ -138,63 +165,12 @@ async function autoLogin() {
         return false;
     }
 }
-
-// Routes
-
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Welstory API Backend is running' });
-});
-
-// Login (now just returns pre-authenticated user info)
-app.post('/api/login', async (req, res) => {
-    try {
-        if (!globalUserInfo) {
-            return res.status(400).json({ 
-                error: 'Server not authenticated. Check credentials in .env file.' 
-            });
-        }
-
-        res.json({
-            success: true,
-            userInfo: globalUserInfo,
-            sessionId: 'default'
-        });
-
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(400).json({ 
-            error: error.message || 'Login failed' 
-        });
-    }
-});
-
-// Refresh session
-app.post('/api/refresh', async (req, res) => {
-    try {
-        const { sessionId } = req.body;
-        const client = getClient(sessionId || 'default');
-        
-        const expiresIn = await client.refreshSession();
-        
-        res.json({
-            success: true,
-            expiresIn,
-            expiresInMinutes: Math.floor(expiresIn / 60000)
-        });
-
-    } catch (error) {
-        console.error('Refresh error:', error);
-        res.status(400).json({ 
-            error: error.message || 'Session refresh failed' 
-        });
-    }
-});
+autoLogin()
 
 // Search restaurants
 app.post('/api/restaurants/search', async (req, res) => {
     try {
-        const { searchQuery, sessionId } = req.body;
+        const { searchQuery  } = req.body;
         
         if (!searchQuery) {
             return res.status(400).json({ 
@@ -202,7 +178,6 @@ app.post('/api/restaurants/search', async (req, res) => {
             });
         }
 
-        const client = getClient(sessionId || 'default');
         const restaurants = await client.searchRestaurant(searchQuery);
         
         // Convert restaurant objects to plain objects for JSON serialization
@@ -226,102 +201,10 @@ app.post('/api/restaurants/search', async (req, res) => {
     }
 });
 
-// Check restaurant registration
-app.post('/api/restaurants/check-registration', async (req, res) => {
-    try {
-        const { restaurantId, sessionId } = req.body;
-        const client = getClient(sessionId || 'default');
-        
-        // Get the restaurant from client's search results
-        const restaurants = await client.searchRestaurant(''); // This is not ideal, but we need the restaurant object
-        const restaurant = restaurants.find(r => r.id === restaurantId);
-        
-        if (!restaurant) {
-            return res.status(404).json({ 
-                error: 'Restaurant not found' 
-            });
-        }
-        
-        const isRegistered = await restaurant.checkIsRegistered();
-        
-        res.json({
-            success: true,
-            isRegistered
-        });
-
-    } catch (error) {
-        console.error('Registration check error:', error);
-        res.status(400).json({ 
-            error: error.message || 'Registration check failed' 
-        });
-    }
-});
-
-// Register restaurant
-app.post('/api/restaurants/register', async (req, res) => {
-    try {
-        const { restaurantData, sessionId } = req.body;
-        const client = getClient(sessionId || 'default');
-        
-        // Create restaurant object from data
-        const { WelstoryRestaurant } = await import('welstory-api-wrapper');
-        const restaurant = new WelstoryRestaurant(
-            client,
-            restaurantData.id,
-            restaurantData.name,
-            restaurantData.description
-        );
-        
-        await restaurant.register();
-        
-        res.json({
-            success: true,
-            message: `Successfully registered ${restaurantData.name}`
-        });
-
-    } catch (error) {
-        console.error('Registration error:', error);
-        res.status(400).json({ 
-            error: error.message || 'Registration failed' 
-        });
-    }
-});
-
-// Unregister restaurant
-app.post('/api/restaurants/unregister', async (req, res) => {
-    try {
-        const { restaurantData, sessionId } = req.body;
-        const client = getClient(sessionId || 'default');
-        
-        // Create restaurant object from data
-        const { WelstoryRestaurant } = await import('welstory-api-wrapper');
-        const restaurant = new WelstoryRestaurant(
-            client,
-            restaurantData.id,
-            restaurantData.name,
-            restaurantData.description
-        );
-        
-        await restaurant.unregister();
-        
-        res.json({
-            success: true,
-            message: `Successfully unregistered ${restaurantData.name}`
-        });
-
-    } catch (error) {
-        console.error('Unregistration error:', error);
-        res.status(400).json({ 
-            error: error.message || 'Unregistration failed' 
-        });
-    }
-});
-
 // Get meal times
 app.post('/api/restaurants/meal-times', async (req, res) => {
     try {
-        const { restaurantData, sessionId } = req.body;
-        const client = getClient(sessionId || 'default');
+        const { restaurantData } = req.body;
         
         // Create restaurant object from data
         const { WelstoryRestaurant } = await import('welstory-api-wrapper');
@@ -367,7 +250,6 @@ app.post('/api/restaurants/meals', async (req, res) => {
         }
         
         console.log(`🔄 Cache miss for meals: ${restaurantData.name} - ${date} - ${mealTimeId}`);
-        const client = getClient(sessionId || 'default');
         
         // Create restaurant object from data
         const { WelstoryRestaurant } = await import('welstory-api-wrapper');
@@ -424,7 +306,6 @@ app.post('/api/meals/nutrition/bulk', async (req, res) => {
             });
         }
         
-        const client = getClient(sessionId || 'default');
         const { WelstoryRestaurant, WelstoryMeal } = await import('welstory-api-wrapper');
         
         const nutritionResults = [];
@@ -451,10 +332,12 @@ app.post('/api/meals/nutrition/bulk', async (req, res) => {
                 let cachedData = readCache(cacheKey);
                 if (cachedData) {
                     console.log(`📋 Cache hit for nutrition: ${mealData.name}`);
+                    // Process main course detection on cached data too
+                    const processedCachedData = processMainCourseDetection(cachedData, mealData.setName);
                     nutritionResults.push({
                         mealIndex: i,
                         success: true,
-                        nutritionData: cachedData,
+                        nutritionData: processedCachedData,
                         mealName: mealData.name,
                         cached: true
                     });
@@ -486,14 +369,17 @@ app.post('/api/meals/nutrition/bulk', async (req, res) => {
                 
                 const nutritionData = await meal.listMealMenus();
                 
+                // Process main course detection
+                const processedNutritionData = processMainCourseDetection(nutritionData, mealData.setName);
+                
                 // Cache the result
-                writeCache(cacheKey, nutritionData);
+                writeCache(cacheKey, processedNutritionData);
                 console.log(`💾 Cached nutrition data for ${mealData.name}`);
                 
                 nutritionResults.push({
                     mealIndex: i,
                     success: true,
-                    nutritionData,
+                    nutritionData: processedNutritionData,
                     mealName: mealData.name,
                     cached: false
                 });
@@ -551,16 +437,17 @@ app.post('/api/meals/nutrition', async (req, res) => {
         let cachedData = readCache(cacheKey);
         if (cachedData) {
             console.log(`📊 Cache hit for nutrition: ${mealData.name}`);
+            // Process main course detection on cached data too
+            const processedCachedData = processMainCourseDetection(cachedData, mealData.setName);
             return res.json({
                 success: true,
-                nutritionData: cachedData,
+                nutritionData: processedCachedData,
                 mealName: mealData.name,
                 cached: true
             });
         }
         
         console.log(`🔄 Cache miss for nutrition: ${mealData.name}`);
-        const client = getClient(sessionId || 'default');
         
         // Create restaurant and meal objects from data
         const { WelstoryRestaurant, WelstoryMeal } = await import('welstory-api-wrapper');
@@ -588,13 +475,16 @@ app.post('/api/meals/nutrition', async (req, res) => {
         
         const nutritionData = await meal.listMealMenus();
         
+        // Process main course detection
+        const processedNutritionData = processMainCourseDetection(nutritionData, mealData.setName);
+        
         // Cache the result
-        writeCache(cacheKey, nutritionData);
+        writeCache(cacheKey, processedNutritionData);
         console.log(`💾 Cached nutrition data for ${mealData.name}`);
         
         res.json({
             success: true,
-            nutritionData,
+            nutritionData: processedNutritionData,
             mealName: mealData.name,
             cached: false
         });
@@ -637,7 +527,6 @@ app.post('/api/meals/menu-items', async (req, res) => {
         }
         
         console.log(`🔄 Cache miss for menu items: ${mealData.name}`);
-        const client = getClient(sessionId || 'default');
         
         // Create restaurant and meal objects from data
         const { WelstoryRestaurant, WelstoryMeal } = await import('welstory-api-wrapper');
@@ -759,7 +648,4 @@ app.listen(PORT, async () => {
     console.log(`🚀 Welstory API Backend running on http://localhost:${PORT}`);
     console.log(`📱 Frontend available at http://localhost:${PORT}`);
     console.log(`🔧 API endpoints available at http://localhost:${PORT}/api/`);
-    
-    // Attempt auto-login
-    await autoLogin();
 });

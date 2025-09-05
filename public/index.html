@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웰스토리 API 프론트엔드</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>🍽️ Welplan</h1>
+                <p>니1가 원하는 웰스토리 메뉴보기</p>
+            </div>
+            
+            <!-- Tab Navigation in Header -->
+            <div class="header-navigation">
+                <button class="header-tab-btn active" onclick="switchTab('restaurants', this)">🍽️ 식당 설정</button>
+                <button class="header-tab-btn" onclick="switchTab('takein', this)">🍴 테이크 인</button>
+                <button class="header-tab-btn" onclick="switchTab('takeout', this)">📦 테이크 아웃</button>
+                <button class="header-tab-btn" onclick="switchTab('system', this)">⚙️ 시스템</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="status info"><strong>베타 테스트 중!</strong> 자주 터지거나 메뉴가 안나올 수 있음. <br>캐싱이 있어서 최초 접속 한번은 느릴 수 있음. 모바일? 기다리</div>
+
+            <!-- Restaurant Selection Tab -->
+            <div id="restaurants-tab" class="tab-content active">
+                <div class="status info">식당 추가 했으면 위에 테이크 인/테이크 아웃 탭 눌러라</div>
+                <!-- Restaurant Search Section -->
+                <div class="section">
+                    <h2>🔍 식당 검색</h2>
+                    <div id="searchStatus"></div>
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label for="restaurantSearch">식당명:</label>
+                            <input type="text" id="restaurantSearch" placeholder="식당명을 입력하세요">
+                        </div>
+                        <button class="btn" onclick="searchRestaurants()">검색</button>
+                    </div>
+                    <div id="restaurantResults" class="results"></div>
+                </div>
+
+                <!-- Selected Restaurants Section -->
+                <div class="section">
+                    <h2>📍 선택된 식당</h2>
+                    <div id="selectedRestaurantsStatus"></div>
+                    <div id="selectedRestaurantsList" class="results">
+                        <p>선택된 식당이 없습니다. 위에서 식당을 검색하고 선택하세요.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Take In Meals Tab -->
+            <div id="takein-tab" class="tab-content">
+                <!-- Meals Section -->
+                <div class="section">
+                    <h2>🍴 테이크 인 메뉴</h2>
+                    <div class="status info">테이블 헤더 누르면 정렬 됨</div>
+                    <div id="takeinMealsStatus"></div>
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <input type="date" id="takeinMealDate" value="" onchange="onTakeinMealDateChange()">
+                        </div>
+                        <div class="form-group">
+                            <select id="takeinMealTimeId" onchange="onTakeinMealTimeChange()">
+                                <option value="">식사 시간 선택</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="takeinFilterMainOnly" onchange="onTakeinFilterChange()"> 
+                                메인 메뉴만 먹고 치울꺼임
+                            </label>
+                            <label>
+                                <input checked type="checkbox" id="takeinFilterExcludeOptional" onchange="onTakeinFilterChange()"> 
+                                추가찬 안먹어 (음료수도 제로로)
+                            </label>
+                        </div>
+                    </div>
+                    <div id="takeinMealsResults" class="results"></div>
+                </div>
+            </div>
+
+            <!-- Take Out Meals Tab -->
+            <div id="takeout-tab" class="tab-content">
+                <div class="status info">개선 예정: 음료수 치우기, 코인 계산 등</div>
+
+                <!-- Meals Section -->
+                <div class="section">
+                    <h2>📦 테이크 아웃 메뉴</h2>
+                    <div class="status info">테이블 헤더 누르면 정렬 됨</div>
+                    <div id="takeoutMealsStatus"></div>
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <select id="takeoutRestaurantSelect" onchange="onTakeoutRestaurantChange()">
+                                <option value="">테이크 아웃 식당을 선택하세요</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <input type="date" id="takeoutMealDate" value="" onchange="onTakeoutMealDateChange()">
+                        </div>
+                        <div class="form-group">
+                            <select id="takeoutMealTimeId" onchange="onTakeoutMealTimeChange()">
+                                <option value="">식사 시간 선택</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="takeoutMealsResults" class="results"></div>
+                </div>
+            </div>
+
+            <!-- System Status Tab -->
+            <div id="system-tab" class="tab-content">
+                <div class="section">
+                    <h2>🔐 시스템 상태</h2>
+                    <div class="status info">누르면 서버 힘들어 하니까 그만 눌러</div>
+                    <div id="loginStatus"></div>
+                    <div id="sessionStatus"></div>
+                    <div id="userInfoSection" class="hidden">
+                        <div id="userInfo" style="font-size: 13px; margin-bottom: 8px;"></div>
+                    </div>
+                    <div>
+                        <button class="btn" onclick="getCacheStatus()">캐시 상태</button>
+                        <button class="btn" onclick="clearCache()">캐시 삭제</button>
+                    </div>
+                    <div id="cacheStatus" class="results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
