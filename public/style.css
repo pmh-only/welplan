@@ -416,12 +416,13 @@ body {
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     .content {
-        padding: 16px;
+        padding: 12px;
     }
     
     .section {
         padding: 16px;
         margin-bottom: 16px;
+        border-radius: 8px;
     }
     
     .form-inline {
@@ -433,32 +434,156 @@ body {
         min-width: unset;
     }
     
+    .header {
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
     .header-navigation {
         flex-wrap: wrap;
-        gap: 4px;
+        gap: 6px;
+        justify-content: center;
     }
     
     .header-tab-btn {
-        padding: 8px 12px;
-        font-size: 12px;
-        min-width: 80px;
+        padding: 10px 14px;
+        font-size: 13px;
+        min-width: 90px;
     }
     
     .btn {
-        padding: 10px 16px;
-        font-size: 13px;
-    }
-    
-    .header {
-        padding: 16px 20px;
+        padding: 12px 16px;
+        font-size: 14px;
+        width: 100%;
+        justify-content: center;
     }
     
     .header h1 {
-        font-size: 1.25rem;
+        font-size: 1.3rem;
+        text-align: center;
+    }
+    
+    .header p {
+        font-size: 0.85rem;
+        text-align: center;
+    }
+    
+    .header-left {
+        align-items: center;
+        text-align: center;
+    }
+    
+    /* Grid layouts for mobile */
+    #restaurantResults.results, #selectedRestaurantsList.results {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .compact-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+
+/* Tablet breakpoint */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .content {
+        padding: 20px;
+    }
+    
+    .header-navigation {
+        gap: 6px;
+    }
+    
+    .header-tab-btn {
+        padding: 10px 14px;
+        font-size: 13px;
+        min-width: 100px;
+    }
+    
+    #restaurantResults.results, #selectedRestaurantsList.results {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    
+    .compact-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+    }
+}
+
+/* Small mobile breakpoint */
+@media (max-width: 480px) {
+    .content {
+        padding: 8px;
+    }
+    
+    .section {
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 6px;
+    }
+    
+    .section h2 {
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+    }
+    
+    .header {
+        padding: 10px 12px;
+    }
+    
+    .header h1 {
+        font-size: 1.2rem;
     }
     
     .header p {
         font-size: 0.8rem;
+    }
+    
+    .header-tab-btn {
+        padding: 8px 10px;
+        font-size: 12px;
+        min-width: 70px;
+    }
+    
+    .btn {
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+    
+    .form-group input, 
+    .form-group select {
+        padding: 10px 14px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    .status {
+        padding: 10px 12px;
+        font-size: 13px;
+        margin-bottom: 10px;
+    }
+    
+    .restaurant-card, .meal-card {
+        padding: 14px;
+        margin-bottom: 12px;
+        border-radius: 8px;
+    }
+    
+    .restaurant-card h3, .meal-card h3 {
+        font-size: 1rem;
+        margin-bottom: 6px;
+    }
+    
+    .restaurant-card p, .meal-card p {
+        font-size: 13px;
+        margin-bottom: 4px;
     }
 }
 
@@ -530,30 +655,172 @@ body {
     color: #000;
 }
 
-/* Mobile table responsiveness */
+/* Mobile table responsiveness - Card view (default mobile) */
 @media (max-width: 768px) {
     .meals-table {
-        font-size: 11px;
+        font-size: 12px;
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
     }
     
-    .meals-table th,
+    .meals-table thead {
+        display: block;
+    }
+    
+    .meals-table tbody {
+        display: block;
+    }
+    
+    .meals-table tr {
+        display: block;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 8px;
+        border-radius: 6px;
+        background: white;
+        padding: 8px;
+        position: relative;
+    }
+    
+    /* Sort indicator on mobile cards */
+    .meals-table tr::before {
+        content: attr(data-sort-value);
+        position: absolute;
+        top: 4px;
+        right: 8px;
+        font-size: 10px;
+        color: #9ca3af;
+        background: #f3f4f6;
+        padding: 2px 4px;
+        border-radius: 3px;
+        display: none; /* Only show when actively sorted */
+    }
+    
+    .meals-table.sorted tr::before {
+        display: block;
+    }
+    
+    .meals-table th {
+        display: none; /* Hide headers in mobile stacked view */
+    }
+    
     .meals-table td {
-        padding: 4px 3px;
+        display: block;
+        padding: 6px 0;
+        border: none;
+        text-align: left !important;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+    
+    /* Add labels for mobile view */
+    .meals-table td:before {
+        content: attr(data-label) ": ";
+        font-weight: bold;
+        color: #374151;
+        display: inline-block;
+        width: 100px;
+        margin-right: 10px;
+    }
+    
+    /* Special handling for nutrition columns */
+    .meals-table .nutrition-col:before {
+        font-size: 11px;
+        width: 80px;
     }
     
     .restaurant-badge {
         font-size: 10px;
-        padding: 1px 4px;
+        padding: 2px 6px;
+        margin-bottom: 4px;
+        display: inline-block;
     }
     
     .meal-image-thumb {
         width: 30px;
         height: 30px;
+        margin: 4px 0;
+    }
+    
+    .btn-small {
+        padding: 4px 8px;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+    
+    /* Alternative horizontal scroll table for complex data */
+    .meals-table.horizontal-scroll {
+        display: table;
+        min-width: 100%;
+        width: max-content;
+    }
+    
+    .meals-table.horizontal-scroll thead {
+        display: table-header-group;
+    }
+    
+    .meals-table.horizontal-scroll tbody {
+        display: table-row-group;
+    }
+    
+    .meals-table.horizontal-scroll tr {
+        display: table-row;
+        border: none;
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+    }
+    
+    .meals-table.horizontal-scroll tr::before {
+        display: none;
+    }
+    
+    .meals-table.horizontal-scroll th {
+        display: table-cell;
+        padding: 8px 4px;
+        font-size: 11px;
+    }
+    
+    .meals-table.horizontal-scroll td {
+        display: table-cell;
+        padding: 6px 4px;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+    }
+    
+    .meals-table.horizontal-scroll td:before {
+        display: none;
+    }
+}
+
+/* Very small mobile screens */
+@media (max-width: 480px) {
+    .meals-table {
+        font-size: 11px;
+    }
+    
+    .meals-table td:before {
+        font-size: 11px;
+        width: 90px;
+        margin-right: 8px;
+    }
+    
+    .restaurant-badge {
+        font-size: 9px;
+        padding: 1px 4px;
+    }
+    
+    .meal-image-thumb {
+        width: 25px;
+        height: 25px;
     }
     
     .btn-small {
         padding: 3px 6px;
-        font-size: 14px;
+        font-size: 11px;
     }
 }
 
@@ -753,4 +1020,176 @@ body {
 
 .meals-table th[title]:not(.sort-asc):not(.sort-desc):hover::after {
     opacity: 1;
+}
+
+/* Touch-friendly enhancements */
+@media (pointer: coarse) {
+    .btn {
+        min-height: 44px; /* iOS recommended touch target */
+        min-width: 44px;
+    }
+    
+    .header-tab-btn {
+        min-height: 44px;
+        min-width: 88px;
+        padding: 12px 16px;
+    }
+    
+    input[type="checkbox"] {
+        min-height: 20px;
+        min-width: 20px;
+    }
+    
+    .meals-table td {
+        min-height: 44px;
+        padding: 12px 8px;
+    }
+    
+    .btn-small {
+        min-height: 36px;
+        min-width: 36px;
+    }
+    
+    /* Better touch targets for sortable headers */
+    .meals-table th {
+        min-height: 44px;
+        padding: 14px 8px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* Mobile view toggle and sort controls */
+.mobile-table-controls {
+    display: none;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .mobile-table-controls {
+        display: flex;
+    }
+}
+
+.mobile-sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.mobile-sort-label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.mobile-sort-select {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: white;
+    min-width: 120px;
+}
+
+.mobile-sort-direction {
+    padding: 4px 8px;
+    font-size: 12px;
+    background: #6b7280;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mobile-sort-direction:hover {
+    background: #4b5563;
+}
+
+.mobile-sort-direction.asc::after {
+    content: '↑';
+}
+
+.mobile-sort-direction.desc::after {
+    content: '↓';
+}
+
+.view-toggle-btn {
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.view-toggle-btn:hover {
+    background: #4b5563;
+}
+
+.view-toggle-btn.active {
+    background: #10b981;
+}
+
+/* Improved focus styles for accessibility */
+input:focus,
+select:focus,
+button:focus {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .status.success {
+        background: #000;
+        color: #fff;
+        border-color: #fff;
+    }
+    
+    .status.error {
+        background: #ff0000;
+        color: #fff;
+        border-color: #fff;
+    }
+    
+    .btn {
+        border: 2px solid #000;
+    }
+    
+    .meals-table th,
+    .meals-table td {
+        border: 2px solid #000;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .btn:hover {
+        transform: none;
+    }
+    
+    .restaurant-card:hover,
+    .meal-card:hover {
+        transform: none;
+    }
 }

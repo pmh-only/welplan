@@ -1309,11 +1309,12 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
     
     resultsDiv.innerHTML = tableHTML;
     
-    // Make the table sortable
+    // Make the table sortable and add mobile controls
     setTimeout(() => {
         const table = resultsDiv.querySelector('.meals-table');
         if (table) {
             makeTableSortable(table, resultsElementId);
+            addMobileSortControls(table, resultsElementId, processedMeals);
         }
     }, 100);
     
@@ -1788,8 +1789,8 @@ window.onTakeoutFilterDrinksChange = function() {
     }
 };
 
-// Table sorting functionality
-function sortTable(tableId, columnIndex, dataType = 'string') {
+// Table sorting functionality - works for both desktop and mobile
+function sortTable(tableId, columnIndex, dataType = 'string', sortDirection = null) {
     const table = document.getElementById(tableId) || document.querySelector(`#${tableId} table`) || document.querySelector('.meals-table');
     if (!table) return;
     
@@ -1798,7 +1799,7 @@ function sortTable(tableId, columnIndex, dataType = 'string') {
     
     const rows = Array.from(tbody.querySelectorAll('tr'));
     const currentDirection = table.getAttribute('data-sort-direction') || 'asc';
-    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    const newDirection = sortDirection || (currentDirection === 'asc' ? 'desc' : 'asc');
     
     // Clear previous sort indicators
     table.querySelectorAll('th').forEach(th => {
@@ -1818,8 +1819,11 @@ function sortTable(tableId, columnIndex, dataType = 'string') {
         
         // Handle different data types
         if (dataType === 'number') {
-            aValue = parseFloat(aValue) || 0;
-            bValue = parseFloat(bValue) || 0;
+            // Extract numbers from text (handle "123 kcal", "45.2g" etc.)
+            const aNum = parseFloat(aValue.replace(/[^\d.-]/g, '')) || 0;
+            const bNum = parseFloat(bValue.replace(/[^\d.-]/g, '')) || 0;
+            aValue = aNum;
+            bValue = bNum;
         } else if (dataType === 'string') {
             aValue = aValue.toLowerCase();
             bValue = bValue.toLowerCase();
@@ -1842,18 +1846,142 @@ function sortTable(tableId, columnIndex, dataType = 'string') {
         targetHeader.setAttribute('title', `${targetHeader.textContent} (sorted ${newDirection})`);
     }
     
+    // Add mobile sort indicators to rows
+    const headerText = targetHeader ? targetHeader.textContent.trim() : 'Column';
+    table.classList.add('sorted');
+    rows.forEach((row, index) => {
+        const sortValue = row.cells[columnIndex] ? row.cells[columnIndex].textContent.trim() : '';
+        const displayValue = dataType === 'number' ? parseFloat(sortValue.replace(/[^\d.-]/g, '')) || 0 : sortValue;
+        row.setAttribute('data-sort-value', `${headerText}: ${displayValue}`);
+    });
+    
     table.setAttribute('data-sort-direction', newDirection);
+    table.setAttribute('data-sort-column', columnIndex);
+    table.setAttribute('data-sort-type', dataType);
+    
+    // Update mobile sort controls if they exist
+    updateMobileSortIndicators(tableId, columnIndex, newDirection);
 }
 
-// Make table headers sortable
+// Add mobile sort controls
+function addMobileSortControls(tableElement, tableId, mealsData) {
+    if (!tableElement) return;
+    
+    // Check if controls already exist
+    let controlsContainer = tableElement.parentElement.querySelector('.mobile-table-controls');
+    
+    if (!controlsContainer) {
+        controlsContainer = document.createElement('div');
+        controlsContainer.className = 'mobile-table-controls';
+        tableElement.parentElement.insertBefore(controlsContainer, tableElement);
+    }
+    
+    // Get column headers
+    const headers = Array.from(tableElement.querySelectorAll('thead th'));
+    const columnOptions = headers.map((header, index) => {
+        let dataType = 'string';
+        if (header.classList.contains('nutrition-header') || 
+            header.textContent.includes('P-Score') ||
+            header.textContent.includes('Calories') || 
+            header.textContent.includes('Carbs') || 
+            header.textContent.includes('Sugar') || 
+            header.textContent.includes('Fiber') || 
+            header.textContent.includes('Fat') || 
+            header.textContent.includes('Protein')) {
+            dataType = 'number';
+        }
+        
+        return {
+            index,
+            label: header.textContent.trim(),
+            dataType
+        };
+    }).filter(col => col.label && col.label !== 'Action'); // Filter out empty headers and action columns
+    
+    controlsContainer.innerHTML = `
+        <div class="mobile-sort-controls">
+            <span class="mobile-sort-label">정렬:</span>
+            <select class="mobile-sort-select" id="mobile-sort-${tableId}">
+                <option value="">선택</option>
+                ${columnOptions.map(col => `<option value="${col.index}" data-type="${col.dataType}">${col.label}</option>`).join('')}
+            </select>
+            <button class="mobile-sort-direction asc" id="mobile-sort-dir-${tableId}" title="정렬 방향 변경">
+                오름차순
+            </button>
+        </div>
+    `;
+    
+    // Add event listeners
+    const sortSelect = controlsContainer.querySelector(`#mobile-sort-${tableId}`);
+    const sortDirectionBtn = controlsContainer.querySelector(`#mobile-sort-dir-${tableId}`);
+    
+    sortSelect.addEventListener('change', (e) => {
+        const selectedIndex = e.target.value;
+        const selectedOption = e.target.options[e.target.selectedIndex];
+        const dataType = selectedOption.getAttribute('data-type') || 'string';
+        
+        if (selectedIndex !== '') {
+            const currentDirection = sortDirectionBtn.classList.contains('asc') ? 'asc' : 'desc';
+            sortTable(tableId, parseInt(selectedIndex), dataType, currentDirection);
+        }
+    });
+    
+    sortDirectionBtn.addEventListener('click', () => {
+        const isAsc = sortDirectionBtn.classList.contains('asc');
+        const newDirection = isAsc ? 'desc' : 'asc';
+        
+        // Toggle button state
+        sortDirectionBtn.classList.toggle('asc', !isAsc);
+        sortDirectionBtn.classList.toggle('desc', isAsc);
+        sortDirectionBtn.textContent = isAsc ? '내림차순' : '오름차순';
+        
+        // Apply sort if column is selected
+        const selectedIndex = sortSelect.value;
+        if (selectedIndex !== '') {
+            const selectedOption = sortSelect.options[sortSelect.selectedIndex];
+            const dataType = selectedOption.getAttribute('data-type') || 'string';
+            sortTable(tableId, parseInt(selectedIndex), dataType, newDirection);
+        }
+    });
+}
+
+// Update mobile sort indicators
+function updateMobileSortIndicators(tableId, columnIndex, direction) {
+    const sortSelect = document.querySelector(`#mobile-sort-${tableId}`);
+    const sortDirectionBtn = document.querySelector(`#mobile-sort-dir-${tableId}`);
+    
+    if (sortSelect && sortDirectionBtn) {
+        // Update select to show current sorted column
+        sortSelect.value = columnIndex;
+        
+        // Update direction button
+        const isAsc = direction === 'asc';
+        sortDirectionBtn.classList.toggle('asc', isAsc);
+        sortDirectionBtn.classList.toggle('desc', !isAsc);
+        sortDirectionBtn.textContent = isAsc ? '오름차순' : '내림차순';
+    }
+}
+
+// Make table headers sortable and add mobile data labels
 function makeTableSortable(tableElement, tableId) {
     if (!tableElement) return;
     
     const headers = tableElement.querySelectorAll('thead th');
+    const rows = tableElement.querySelectorAll('tbody tr');
+    
     headers.forEach((header, index) => {
         header.style.cursor = 'pointer';
         header.style.userSelect = 'none';
         header.setAttribute('title', header.textContent + ' (click to sort)');
+        
+        // Add data labels for mobile responsiveness
+        const headerText = header.textContent.trim();
+        rows.forEach(row => {
+            const cell = row.cells[index];
+            if (cell) {
+                cell.setAttribute('data-label', headerText);
+            }
+        });
         
         // Determine data type based on column content
         let dataType = 'string';
