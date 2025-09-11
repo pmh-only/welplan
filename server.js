@@ -19,6 +19,16 @@ if (!fs.existsSync(CACHE_DIR)) {
     console.log('📁 Created cache directory');
 }
 
+// Clean up expired cache files on startup
+console.log('🧹 Cleaning up expired cache files...');
+cleanupExpiredCache();
+
+// Set up periodic cache cleanup (every 30 minutes)
+const CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutes in milliseconds
+setInterval(() => {
+    cleanupExpiredCache();
+}, CLEANUP_INTERVAL);
+
 // Cache utility functions
 function getCacheKey(prefix, ...args) {
     const data = args.join('|');
@@ -123,6 +133,31 @@ function clearCache(pattern = null) {
     }
 }
 
+function cleanupExpiredCache() {
+    try {
+        const files = fs.readdirSync(CACHE_DIR);
+        let deletedCount = 0;
+        
+        for (const file of files) {
+            if (file.endsWith('.json')) {
+                const filePath = path.join(CACHE_DIR, file);
+                if (!isCacheValid(filePath, CACHE_TTL)) {
+                    fs.unlinkSync(filePath);
+                    deletedCount++;
+                }
+            }
+        }
+        
+        if (deletedCount > 0) {
+            console.log(`🗑️  Cleaned up ${deletedCount} expired cache files`);
+        }
+        return deletedCount;
+    } catch (error) {
+        console.warn('Cache cleanup error:', error.message);
+        return 0;
+    }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -206,6 +241,16 @@ app.post('/api/restaurants/meal-times', async (req, res) => {
     try {
         const { restaurantData } = req.body;
         
+        // Validate input
+        if (!restaurantData || !restaurantData.id || !restaurantData.name) {
+            console.warn('⚠️ Invalid restaurant data provided for meal times');
+            return res.status(400).json({ 
+                error: 'Valid restaurant data is required' 
+            });
+        }
+        
+        console.log(`🕐 Fetching meal times for restaurant: ${restaurantData.name} (ID: ${restaurantData.id})`);
+        
         // Create restaurant object from data
         const { WelstoryRestaurant } = await import('welstory-api-wrapper');
         const restaurant = new WelstoryRestaurant(
@@ -217,9 +262,16 @@ app.post('/api/restaurants/meal-times', async (req, res) => {
         
         const mealTimes = await withAutoRelogin(() => restaurant.listMealTimes());
         
+        // Log the result
+        if (!mealTimes || mealTimes.length === 0) {
+            console.warn(`⚠️ No meal times found for restaurant: ${restaurantData.name} (ID: ${restaurantData.id})`);
+        } else {
+            console.log(`✅ Found ${mealTimes.length} meal times for restaurant: ${restaurantData.name}`);
+        }
+        
         res.json({
             success: true,
-            mealTimes
+            mealTimes: mealTimes || []
         });
 
     } catch (error) {

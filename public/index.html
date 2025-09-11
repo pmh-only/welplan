@@ -89,6 +89,18 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Mobile Table Controls -->
+                    <div class="mobile-table-controls">
+                        <span>📱 모바일 보기:</span>
+                        <label>
+                            <input type="radio" name="takeinTableView" value="card" checked onchange="toggleMobileTableView('takein', this.value)"> 카드형
+                        </label>
+                        <label>
+                            <input type="radio" name="takeinTableView" value="scroll" onchange="toggleMobileTableView('takein', this.value)"> 스크롤 테이블
+                        </label>
+                    </div>
+                    
                     <div id="takeinMealsResults" class="results"></div>
                 </div>
             </div>
@@ -133,6 +145,18 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Mobile Table Controls -->
+                    <div class="mobile-table-controls">
+                        <span>📱 모바일 보기:</span>
+                        <label>
+                            <input type="radio" name="takeoutTableView" value="card" checked onchange="toggleMobileTableView('takeout', this.value)"> 카드형
+                        </label>
+                        <label>
+                            <input type="radio" name="takeoutTableView" value="scroll" onchange="toggleMobileTableView('takeout', this.value)"> 스크롤 테이블
+                        </label>
+                    </div>
+                    
                     <div id="takeoutMealsResults" class="results"></div>
                 </div>
             </div>

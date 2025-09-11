@@ -816,11 +816,35 @@ body {
         margin-top: 4px;
     }
     
+    /* Scrollable table wrapper for mobile */
+    .table-scroll-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        margin: 8px 0;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar {
+        height: 4px;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-thumb {
+        background: #10b981;
+        border-radius: 4px;
+    }
+
     /* Alternative horizontal scroll table for complex data */
     .meals-table.horizontal-scroll {
         display: table;
         min-width: 100%;
         width: max-content;
+        margin: 0;
     }
     
     .meals-table.horizontal-scroll thead {

@@ -1325,12 +1325,26 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
         `;
     }
     
-    resultsDiv.innerHTML = tableHTML;
+    // Apply mobile table view wrapper if scroll mode is selected
+    const tabType = resultsElementId.includes('takein') ? 'takein' : 'takeout';
+    const isScrollMode = document.querySelector(`input[name="${tabType}TableView"]:checked`)?.value === 'scroll';
+    
+    if (isScrollMode) {
+        resultsDiv.innerHTML = `<div class="table-scroll-wrapper">${tableHTML}</div>`;
+    } else {
+        resultsDiv.innerHTML = tableHTML;
+    }
     
     // Make the table sortable and add mobile controls
     setTimeout(() => {
         const table = resultsDiv.querySelector('.meals-table');
         if (table) {
+            // Apply mobile scroll class if in scroll mode
+            if (isScrollMode) {
+                table.classList.add('horizontal-scroll');
+            } else {
+                table.classList.remove('horizontal-scroll');
+            }
             makeTableSortable(table, resultsElementId);
             addMobileSortControls(table, resultsElementId, processedMeals);
         }
@@ -2609,3 +2623,21 @@ function checkAndAutoLoadGallery() {
         showStatus('galleryStatus', '📅 날짜와 식사 시간을 선택한 후 "갤러리 로드" 버튼을 클릭하세요', 'info');
     }
 }
+
+// Mobile table view toggle function
+window.toggleMobileTableView = function(tabType, viewType) {
+    console.log(`🔄 Switching ${tabType} table to ${viewType} view`);
+    
+    // Re-display current meals with the new view mode
+    if (window.currentMeals && window.currentMealsResultsId) {
+        const currentResultsId = window.currentMealsResultsId;
+        
+        // Only refresh if it's the correct tab
+        if ((tabType === 'takein' && currentResultsId === 'takeinMealsResults') ||
+            (tabType === 'takeout' && currentResultsId === 'takeoutMealsResults')) {
+            
+            console.log(`🔄 Refreshing ${tabType} table with ${viewType} view`);
+            displayMeals(window.currentMeals, currentResultsId);
+        }
+    }
+};
