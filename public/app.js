@@ -2561,7 +2561,7 @@ function getAutoMealTimeSelection() {
 }
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Load any saved restaurant selections
     loadSelectedRestaurants();
     loadTakeoutRestaurant();
@@ -2581,10 +2581,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('takeoutMealDate').value = todayString;
     document.getElementById('galleryDate').value = todayString;
 
+    // Fetch meal times for any loaded restaurants before initializing gallery
+    if (selectedRestaurants.length > 0) {
+        await autoFetchMealTimes();
+    }
+
     // Initialize gallery tab as default
     initializeGalleryTab();
-
-    autoFetchMealTimes()
 });
 
 // Initialize gallery tab on page load
