@@ -415,6 +415,13 @@ async function autoFetchMealTimes() {
     }
     
     console.log(`🔄 Auto-fetching meal times for ${selectedRestaurants.length} restaurant(s)...`);
+
+    try {
+        // warm up
+        await apiCall('/restaurants/search', {
+            searchQuery: 'R5'
+        });
+    } catch {}
     
     try {
         const uniqueMealTimes = new Map(); // Use Map to avoid duplicates
