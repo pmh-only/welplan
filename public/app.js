@@ -299,7 +299,7 @@ function displayRestaurants() {
             <div style="display: flex; align-items: center; margin-bottom: 10px;">
                 <input type="checkbox" id="restaurant-${index}" ${isSelected ? 'checked' : ''} 
                        onchange="toggleRestaurantSelection(${index})" class="restaurant-checkbox">
-                <h3 style="margin: 0;">${restaurant.name}</h3>
+                <h3 style="margin: 0; margin-left: 10px">${restaurant.name}</h3>
             </div>
             <p>${restaurant.description.split('|').join(' > ')}</p>
         </label>
@@ -1969,6 +1969,9 @@ function sortTable(tableId, columnIndex, dataType = 'string', sortDirection = nu
     
     // Update mobile sort controls if they exist
     updateMobileSortIndicators(tableId, columnIndex, newDirection);
+    
+    // Update URL hash to save sort state
+    updateURLHash();
 }
 
 // Add mobile sort controls
@@ -3298,6 +3301,16 @@ function applyViewState(state) {
     
     // Switch to the correct tab
     switchToTab(state.tab);
+
+    
+    // Apply restaurant selection
+    if (state.restaurant) {
+        const restaurantSelect = document.getElementById('takeoutRestaurantSelect');
+        if (restaurantSelect && restaurantSelect.querySelector(`option[value="${state.restaurant}"]`)) {
+            restaurantSelect.value = state.restaurant;
+            onTakeoutRestaurantChange()
+        }
+    }
     
     // Apply date and meal time
     if (state.date) {
@@ -3338,14 +3351,6 @@ function applyViewState(state) {
     if (state.sort) {
         const sortSelect = document.getElementById('gallerySortBy');
         if (sortSelect) sortSelect.value = state.sort;
-    }
-    
-    // Apply restaurant selection
-    if (state.restaurant) {
-        const restaurantSelect = document.getElementById('takeoutRestaurantSelect');
-        if (restaurantSelect && restaurantSelect.querySelector(`option[value="${state.restaurant}"]`)) {
-            restaurantSelect.value = state.restaurant;
-        }
     }
     
     // Apply table sort
