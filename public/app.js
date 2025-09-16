@@ -6,6 +6,7 @@ let selectedTakeoutRestaurant = null; // Single restaurant for take-out only
 let mealTimes = [];
 let allMealTimes = []; // Store all meal times from all selected restaurants
 let takeoutMealTimes = []; // Store meal times from selected take-out restaurant
+let selectedTakeoutItems = new Set(); // Store selected takeout menu item indices
 
 // Global session management
 let sessionManager = {
@@ -297,7 +298,7 @@ function displayRestaurants() {
         <label for="restaurant-${index}" class="restaurant-card">
             <div style="display: flex; align-items: center; margin-bottom: 10px;">
                 <input type="checkbox" id="restaurant-${index}" ${isSelected ? 'checked' : ''} 
-                       onchange="toggleRestaurantSelection(${index})" style="margin-right: 10px; transform: scale(1.2);">
+                       onchange="toggleRestaurantSelection(${index})" class="restaurant-checkbox">
                 <h3 style="margin: 0;">${restaurant.name}</h3>
             </div>
             <p>${restaurant.description.split('|').join(' > ')}</p>
@@ -325,6 +326,9 @@ window.toggleRestaurantSelection = async function(index) {
         showStatus('searchStatus', `${restaurant.name}을 선택에 추가함`, 'success');
         wasAdded = true;
     }
+    
+    // Update URL hash
+    updateURLHash();
     
     // Save to localStorage
     saveSelectedRestaurants();
@@ -376,6 +380,9 @@ window.removeFromSelection = async function(restaurantId) {
         const restaurant = selectedRestaurants[index];
         selectedRestaurants.splice(index, 1);
         showStatus('selectedRestaurantsStatus', `${restaurant.name}을 선택에서 제거함`, 'info');
+        
+        // Update URL hash
+        updateURLHash();
         
         // Save to localStorage
         saveSelectedRestaurants();
@@ -661,6 +668,8 @@ window.onTakeoutRestaurantChange = async function() {
         saveTakeoutRestaurant();
         updateTakeoutRestaurantDisplay();
         updateTakeoutMealTimeSelect();
+        // Update URL hash
+        updateURLHash();
         return;
     }
     
@@ -669,6 +678,9 @@ window.onTakeoutRestaurantChange = async function() {
     saveTakeoutRestaurant();
     
     updateTakeoutRestaurantDisplay();
+    
+    // Update URL hash
+    updateURLHash();
     
     // Fetch meal times for the selected take-out restaurant
     await fetchTakeoutMealTimes();
@@ -1179,10 +1191,14 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
             }
         });
 
+        // Store menu items globally for selection access
+        window.currentTakeoutItems = allMenuItems;
+        
         tableHTML = `
             <table class="meals-table">
                 <thead>
                     <tr>
+                        <th>선택</th>
                         <th>Restaurant</th>
                         <th>Meal</th>
                         <th>Menu Item</th>
@@ -1195,7 +1211,7 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                     </tr>
                 </thead>
                 <tbody>
-                    ${allMenuItems.map((item) => {
+                    ${allMenuItems.map((item, index) => {
                         // Calculate P-Score for individual menu item
                         const itemNutrition = {
                             calories: item.calorie || 0,
@@ -1206,9 +1222,16 @@ async function displayMeals(meals, resultsElementId = 'mealsResults') {
                         };
                         const pScore = calculatePScore(itemNutrition);
                         const pScoreColor = pScore <= 20 ? '#22c55e' : pScore <= 50 ? '#f59e0b' : '#ef4444';
+                        const isSelected = selectedTakeoutItems.has(index);
                         
                         return `
-                        <tr>
+                        <tr class="takeout-selectable-row ${isSelected ? 'selected-takeout-item' : ''}" onclick="toggleTakeoutItemSelection(${index})">
+                            <td>
+                                <input type="checkbox" 
+                                       id="takeout-item-${index}" 
+                                       ${isSelected ? 'checked' : ''}
+                                       onclick="event.stopPropagation()">
+                            </td>
                             <td>
                                 <span class="restaurant-badge">
                                     📍 ${item.restaurantName || 'Unknown'}
@@ -1679,6 +1702,9 @@ function displayCacheStatus(data) {
 
 // Tab switching functionality
 window.switchTab = function(tabName, clickedElement = null) {
+    // Update URL hash
+    updateURLHash();
+    
     // Hide all tab contents
     const tabContents = document.querySelectorAll('.tab-content');
     tabContents.forEach(content => {
@@ -1769,6 +1795,9 @@ window.switchTab = function(tabName, clickedElement = null) {
             }
         }
     }
+    
+    // Update URL hash when tab changes
+    setTimeout(() => updateURLHash(), 100);
 }
 
 // Handle Take In meal date change
@@ -1784,12 +1813,18 @@ window.onTakeinMealDateChange = function() {
         console.log('🍴 Auto-fetching Take In meals due to date change...');
         getTakeinMeals();
     }
+    
+    // Update URL hash
+    updateURLHash();
 };
 
 // Handle Take In meal time selection change
 window.onTakeinMealTimeChange = function() {
     const mealDate = document.getElementById('takeinMealDate').value;
     const mealTimeId = document.getElementById('takeinMealTimeId').value;
+    
+    // Update URL hash
+    updateURLHash();
     
     // Only auto-fetch if we're on the takein tab, have selected restaurants, date, and meal time
     const takeinTab = document.getElementById('takein-tab');
@@ -1803,6 +1838,9 @@ window.onTakeinMealTimeChange = function() {
 
 // Handle Take In filter change
 window.onTakeinFilterChange = function() {
+    // Update URL hash
+    updateURLHash();
+    
     // Re-display the current meals with the new filter
     if (window.currentMeals && window.currentMeals.length > 0) {
         displayMeals(window.currentMeals, 'takeinMealsResults');
@@ -1813,6 +1851,9 @@ window.onTakeinFilterChange = function() {
 window.onTakeoutMealDateChange = function() {
     const mealDate = document.getElementById('takeoutMealDate').value;
     const mealTimeId = document.getElementById('takeoutMealTimeId').value;
+    
+    // Update URL hash
+    updateURLHash();
     
     // Only auto-fetch if we're on the takeout tab, have selected take-out restaurant, date, and meal time
     const takeoutTab = document.getElementById('takeout-tab');
@@ -1829,6 +1870,9 @@ window.onTakeoutMealTimeChange = function() {
     const mealDate = document.getElementById('takeoutMealDate').value;
     const mealTimeId = document.getElementById('takeoutMealTimeId').value;
     
+    // Update URL hash
+    updateURLHash();
+    
     // Only auto-fetch if we're on the takeout tab, have selected take-out restaurant, date, and meal time
     const takeoutTab = document.getElementById('takeout-tab');
     const isTakeoutTabActive = takeoutTab && takeoutTab.classList.contains('active');
@@ -1841,6 +1885,12 @@ window.onTakeoutMealTimeChange = function() {
 
 // Handle Take Out drinks filter change
 window.onTakeoutFilterDrinksChange = function() {
+    // Update URL hash
+    updateURLHash();
+    
+    // Clear selections when filters change since item indices may change
+    selectedTakeoutItems.clear();
+    
     // Re-display the current take-out meals with the new filter
     if (window.currentMeals && window.currentMeals.length > 0 && window.currentMealsResultsId === 'takeoutMealsResults') {
         displayMeals(window.currentMeals, 'takeoutMealsResults');
@@ -2086,6 +2136,9 @@ window.updatePScoreWeights = function() {
     pScoreWeights.fat = parseFloat(document.getElementById('fatWeight').value) || 0;
     pScoreWeights.protein = parseFloat(document.getElementById('proteinWeight').value) || 0;
     
+    // Update URL hash
+    updateURLHash();
+    
     // Save to localStorage
     savePScoreSettings();
     
@@ -2108,6 +2161,9 @@ window.resetPScoreWeights = function() {
     document.getElementById('sugarWeight').value = pScoreWeights.sugar;
     document.getElementById('fatWeight').value = pScoreWeights.fat;
     document.getElementById('proteinWeight').value = pScoreWeights.protein;
+    
+    // Update URL hash
+    updateURLHash();
     
     // Save to localStorage
     savePScoreSettings();
@@ -2205,6 +2261,11 @@ window.loadGallery = async function() {
                     // Only include meals with photos
                     if (!meal.photoUrl) return false;
                     
+                    // Exclude meals containing "죽" (porridge)
+                    if (meal.name && meal.name.includes('죽')) {
+                        return false;
+                    }
+                    
                     // Take In: exclude meals with "T/O" prefix in course name, BUT include meals with "도시락" in name
                     if (meal.name && meal.name.includes('도시락')) {
                         return true; // 도시락 is always Take In
@@ -2224,6 +2285,29 @@ window.loadGallery = async function() {
             }
         }
         
+        // Remove duplicates based on meal name only (same menu items from different restaurants)
+        const originalCount = galleryMeals.length;
+        const uniqueMealsMap = new Map();
+        
+        galleryMeals.forEach(meal => {
+            const uniqueKey = meal.name.trim().toLowerCase();
+            if (!uniqueMealsMap.has(uniqueKey)) {
+                uniqueMealsMap.set(uniqueKey, meal);
+            } else {
+                // If duplicate found, prefer the one with better photo URL or more recent data
+                const existingMeal = uniqueMealsMap.get(uniqueKey);
+                if (meal.photoUrl && (!existingMeal.photoUrl || meal.photoUrl.length > existingMeal.photoUrl.length)) {
+                    uniqueMealsMap.set(uniqueKey, meal);
+                }
+            }
+        });
+        
+        galleryMeals = Array.from(uniqueMealsMap.values());
+        
+        if (originalCount > galleryMeals.length) {
+            console.log(`🔄 Removed ${originalCount - galleryMeals.length} duplicate meals from gallery`);
+        }
+        
         if (galleryMeals.length === 0) {
             showStatus('galleryStatus', '사진이 있는 메뉴를 찾을 수 없습니다', 'info');
             document.getElementById('galleryGrid').innerHTML = '<div class="gallery-empty">📷 사진이 있는 메뉴가 없습니다</div>';
@@ -2232,7 +2316,7 @@ window.loadGallery = async function() {
         }
         
         // Fetch nutrition data for P-Score calculation
-        showStatus('galleryStatus', `${galleryMeals.length}개 메뉴 사진 발견 - P-Score 계산 중...`, 'info');
+        showStatus('galleryStatus', `${galleryMeals.length}개 고유 메뉴 사진 발견 - P-Score 계산 중...`, 'info');
         const mealsWithNutrition = await fetchNutritionForMeals(galleryMeals);
         galleryMeals = mealsWithNutrition;
         
@@ -2313,7 +2397,9 @@ function displayGallery() {
 
 // Filter gallery
 window.filterGallery = function() {
-    const searchTerm = document.getElementById('gallerySearch').value.toLowerCase();
+    const searchElement = document.getElementById('gallerySearch');
+    if (!searchElement) return;
+    const searchTerm = searchElement.value.toLowerCase();
     
     if (!searchTerm) {
         filteredGalleryMeals = [...galleryMeals];
@@ -2336,6 +2422,9 @@ window.filterGallery = function() {
 
 // Sort gallery
 window.sortGallery = function() {
+    // Update URL hash
+    updateURLHash();
+    
     const sortBy = document.getElementById('gallerySortBy').value;
     
     if (!sortBy) {
@@ -2386,6 +2475,9 @@ function applySortToGallery(sortBy) {
 
 // Toggle gallery labels
 window.toggleGalleryLabels = function() {
+    // Update URL hash
+    updateURLHash();
+    
     displayGallery();
 };
 
@@ -2395,8 +2487,10 @@ function clearGallery() {
     filteredGalleryMeals = [];
     document.getElementById('galleryGrid').innerHTML = '<div class="gallery-empty">📸 식당을 선택하고 날짜/시간을 설정하면 자동으로 갤러리가 표시됩니다</div>';
     document.getElementById('galleryCount').textContent = '0개 이미지';
-    document.getElementById('gallerySearch').value = '';
-    document.getElementById('gallerySortBy').value = '';
+    const gallerySearch = document.getElementById('gallerySearch');
+    if (gallerySearch) gallerySearch.value = '';
+    const gallerySortBy = document.getElementById('gallerySortBy');
+    if (gallerySortBy) gallerySortBy.value = '';
 }
 
 // Show gallery modal
@@ -2479,6 +2573,9 @@ window.showGalleryModal = function(index) {
 
 // Gallery date change handler
 window.onGalleryDateChange = function() {
+    // Update URL hash
+    updateURLHash();
+    
     // Auto-load if all required fields are filled
     const mealDate = document.getElementById('galleryDate').value;
     const mealTimeId = document.getElementById('galleryMealTimeId').value;
@@ -2491,6 +2588,9 @@ window.onGalleryDateChange = function() {
 
 // Gallery meal time change handler
 window.onGalleryMealTimeChange = function() {
+    // Update URL hash
+    updateURLHash();
+    
     // Auto-load if all required fields are filled
     const mealDate = document.getElementById('galleryDate').value;
     const mealTimeId = document.getElementById('galleryMealTimeId').value;
@@ -2595,6 +2695,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Initialize gallery tab as default
     initializeGalleryTab();
+    
+    // Initialize URL state management for shareable links (after restaurant data is loaded)
+    initializeURLStateManagement();
 });
 
 // Initialize gallery tab on page load
@@ -2638,6 +2741,9 @@ function checkAndAutoLoadGallery() {
 window.toggleMobileTableView = function(tabType, viewType) {
     console.log(`🔄 Switching ${tabType} table to ${viewType} view`);
     
+    // Update URL hash
+    updateURLHash();
+    
     // Re-display current meals with the new view mode
     if (window.currentMeals && window.currentMealsResultsId) {
         const currentResultsId = window.currentMealsResultsId;
@@ -2651,3 +2757,783 @@ window.toggleMobileTableView = function(tabType, viewType) {
         }
     }
 };
+
+// Takeout multi-select functionality
+window.toggleTakeoutItemSelection = function(index) {
+    if (selectedTakeoutItems.has(index)) {
+        selectedTakeoutItems.delete(index);
+    } else {
+        selectedTakeoutItems.add(index);
+    }
+    
+    // Update URL hash
+    updateURLHash();
+    
+    updateSelectionUI();
+    updateSelectedItemRow(index);
+};
+
+window.selectAllTakeoutItems = function() {
+    if (!window.currentTakeoutItems) return;
+    
+    selectedTakeoutItems.clear();
+    for (let i = 0; i < window.currentTakeoutItems.length; i++) {
+        selectedTakeoutItems.add(i);
+    }
+    
+    // Update URL hash
+    updateURLHash();
+    
+    updateSelectionUI();
+    updateAllItemRows();
+};
+
+window.clearTakeoutSelection = function() {
+    selectedTakeoutItems.clear();
+    
+    // Update URL hash
+    updateURLHash();
+    
+    updateSelectionUI();
+    updateAllItemRows();
+};
+
+function updateSelectionUI() {
+    const selectedCount = selectedTakeoutItems.size;
+    const countElement = document.getElementById('selectedCount');
+    const aggregatedBtn = document.getElementById('showAggregatedBtn');
+    
+    if (countElement) {
+        countElement.textContent = selectedCount;
+    }
+    
+    if (aggregatedBtn) {
+        aggregatedBtn.disabled = selectedCount === 0;
+    }
+    
+    // Auto-update floating box on PC
+    updateAggregatedNutritionDisplay();
+}
+
+function updateSelectedItemRow(index) {
+    const checkbox = document.getElementById(`takeout-item-${index}`);
+    const row = checkbox?.closest('tr');
+    
+    if (checkbox && row) {
+        checkbox.checked = selectedTakeoutItems.has(index);
+        row.classList.toggle('selected-takeout-item', selectedTakeoutItems.has(index));
+    }
+}
+
+function updateAllItemRows() {
+    if (!window.currentTakeoutItems) return;
+    
+    for (let i = 0; i < window.currentTakeoutItems.length; i++) {
+        updateSelectedItemRow(i);
+    }
+}
+
+window.showAggregatedNutrition = function() {
+    if (!window.currentTakeoutItems || selectedTakeoutItems.size === 0) {
+        alert('선택된 항목이 없습니다.');
+        return;
+    }
+    
+    // Calculate aggregated nutrition
+    const selectedItems = Array.from(selectedTakeoutItems).map(index => window.currentTakeoutItems[index]);
+    
+    const aggregatedNutrition = calculateAggregatedNutrition(selectedItems);
+    
+    // Check if device is PC (screen width > 1024px)
+    if (window.innerWidth > 1024) {
+        showAggregatedNutritionFloat(selectedItems, aggregatedNutrition);
+    } else {
+        showAggregatedNutritionModal(selectedItems, aggregatedNutrition);
+    }
+};
+
+function calculateAggregatedNutrition(items) {
+    return items.reduce((totals, item) => {
+        return {
+            calories: totals.calories + (item.calorie || 0),
+            carbs: totals.carbs + (item.carbohydrate || 0),
+            sugar: totals.sugar + (item.sugar || 0),
+            fiber: totals.fiber + (item.fiber || 0),
+            fat: totals.fat + (item.fat || 0),
+            protein: totals.protein + (item.protein || 0)
+        };
+    }, {
+        calories: 0,
+        carbs: 0,
+        sugar: 0,
+        fiber: 0,
+        fat: 0,
+        protein: 0
+    });
+}
+
+function showAggregatedNutritionModal(selectedItems, aggregatedNutrition) {
+    const modal = document.createElement('div');
+    modal.className = 'image-modal';
+    
+    // Calculate aggregate P-Score
+    const aggregatedPScore = calculatePScore(aggregatedNutrition);
+    const pScoreColor = aggregatedPScore <= 50 ? '#22c55e' : aggregatedPScore <= 100 ? '#f59e0b' : '#ef4444';
+    
+    const content = `
+        <div style="max-height: 80vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 20px;">📊 선택된 ${selectedItems.length}개 항목 통합 영양성분</h2>
+            
+            <!-- Aggregated Totals -->
+            <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: #374151; margin-bottom: 15px;">🧮 통합 영양성분</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px;">
+                    <div style="text-align: center; padding: 10px; background: white; border-radius: 6px;">
+                        <div style="font-size: 14px; color: #6b7280;">P-Score</div>
+                        <div style="font-size: 18px; font-weight: bold; color: ${pScoreColor};">${aggregatedPScore?.toFixed(1) || 'N/A'}</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: white; border-radius: 6px;">
+                        <div style="font-size: 14px; color: #6b7280;">칼로리</div>
+                        <div style="font-size: 18px; font-weight: bold;">${aggregatedNutrition.calories.toFixed(1)} kcal</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: white; border-radius: 6px;">
+                        <div style="font-size: 14px; color: #6b7280;">탄수화물</div>
+                        <div style="font-size: 18px; font-weight: bold;">${aggregatedNutrition.carbs.toFixed(1)}g</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: white; border-radius: 6px;">
+                        <div style="font-size: 14px; color: #6b7280;">당분</div>
+                        <div style="font-size: 18px; font-weight: bold;">${aggregatedNutrition.sugar.toFixed(1)}g</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: white; border-radius: 6px;">
+                        <div style="font-size: 14px; color: #6b7280;">지방</div>
+                        <div style="font-size: 18px; font-weight: bold;">${aggregatedNutrition.fat.toFixed(1)}g</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: white; border-radius: 6px;">
+                        <div style="font-size: 14px; color: #6b7280;">단백질</div>
+                        <div style="font-size: 18px; font-weight: bold;">${aggregatedNutrition.protein.toFixed(1)}g</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Selected Items List -->
+            <h3 style="color: #374151; margin-bottom: 15px;">📋 선택된 항목들</h3>
+            <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f3f4f6;">
+                        <th style="padding: 10px; text-align: left; border: 1px solid #d1d5db;">메뉴</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">칼로리</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">탄수화물</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">당분</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">지방</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">단백질</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${selectedItems.map(item => `
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #d1d5db;">
+                                <strong>${item.name}</strong><br>
+                                <small style="color: #6b7280;">${item.restaurantName} - ${item.mealName}</small>
+                            </td>
+                            <td style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">${(item.calorie || 0).toFixed(1)}</td>
+                            <td style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">${(item.carbohydrate || 0).toFixed(1)}g</td>
+                            <td style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">${(item.sugar || 0).toFixed(1)}g</td>
+                            <td style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">${(item.fat || 0).toFixed(1)}g</td>
+                            <td style="padding: 10px; text-align: center; border: 1px solid #d1d5db;">${(item.protein || 0).toFixed(1)}g</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 90vw; width: 900px;">
+            <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+            ${content}
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
+
+// Handle Enter key press in restaurant search input
+window.handleRestaurantSearchKeyPress = function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        searchRestaurants();
+    }
+};
+
+// Floating nutrition box functionality
+function showAggregatedNutritionFloat(selectedItems, aggregatedNutrition) {
+    // Remove existing floating box if any
+    hideAggregatedNutritionFloat();
+    
+    const aggregatedPScore = calculatePScore(aggregatedNutrition);
+    const pScoreColor = aggregatedPScore <= 50 ? '#22c55e' : aggregatedPScore <= 100 ? '#f59e0b' : '#ef4444';
+    
+    const floatBox = document.createElement('div');
+    floatBox.className = 'aggregated-nutrition-float';
+    floatBox.id = 'aggregatedNutritionFloat';
+    
+    floatBox.innerHTML = `
+        <div class="float-header">
+            <h3 class="float-title">📊 선택된 ${selectedItems.length}개 항목</h3>
+            <button class="float-close" onclick="hideAggregatedNutritionFloat()">&times;</button>
+        </div>
+        <div class="float-content">
+            <div class="selected-items-count">
+                ${selectedItems.map(item => item.name).join(', ')}
+            </div>
+            
+            <div class="nutrition-summary">
+                <div class="nutrition-item pscore-item">
+                    <div class="nutrition-label">P-Score</div>
+                    <div class="nutrition-value pscore-value" style="color: ${pScoreColor};">
+                        ${aggregatedPScore?.toFixed(1) || 'N/A'}
+                    </div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-label">칼로리</div>
+                    <div class="nutrition-value">${aggregatedNutrition.calories.toFixed(1)}</div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-label">탄수화물</div>
+                    <div class="nutrition-value">${aggregatedNutrition.carbs.toFixed(1)}g</div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-label">당분</div>
+                    <div class="nutrition-value">${aggregatedNutrition.sugar.toFixed(1)}g</div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-label">지방</div>
+                    <div class="nutrition-value">${aggregatedNutrition.fat.toFixed(1)}g</div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-label">단백질</div>
+                    <div class="nutrition-value">${aggregatedNutrition.protein.toFixed(1)}g</div>
+                </div>
+            </div>
+            
+            <div class="float-actions">
+                <button class="btn-float" onclick="hideAggregatedNutritionFloat()">닫기</button>
+                <button class="btn-float btn-primary" onclick="showDetailedNutritionModal()">상세보기</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(floatBox);
+    
+    // Trigger animation
+    setTimeout(() => {
+        floatBox.classList.add('visible');
+    }, 50);
+    
+    // Store data for detailed view
+    window.currentFloatData = { selectedItems, aggregatedNutrition };
+}
+
+function hideAggregatedNutritionFloat() {
+    const floatBox = document.getElementById('aggregatedNutritionFloat');
+    if (floatBox) {
+        floatBox.classList.remove('visible');
+        setTimeout(() => {
+            floatBox.remove();
+        }, 300);
+    }
+}
+
+function showDetailedNutritionModal() {
+    if (window.currentFloatData) {
+        showAggregatedNutritionModal(window.currentFloatData.selectedItems, window.currentFloatData.aggregatedNutrition);
+        hideAggregatedNutritionFloat();
+    }
+}
+
+// Auto-update floating box when selections change
+function updateAggregatedNutritionDisplay() {
+    const floatBox = document.getElementById('aggregatedNutritionFloat');
+    
+    if (window.innerWidth > 1024) {
+        // PC: Show floating box if items are selected
+        if (selectedTakeoutItems.size === 0) {
+            hideAggregatedNutritionFloat();
+        } else if (window.currentTakeoutItems && selectedTakeoutItems.size > 0) {
+            const selectedItems = Array.from(selectedTakeoutItems).map(index => window.currentTakeoutItems[index]);
+            const aggregatedNutrition = calculateAggregatedNutrition(selectedItems);
+            showAggregatedNutritionFloat(selectedItems, aggregatedNutrition);
+        }
+        // Hide mobile toolbar on PC
+        hideMobileNutritionToolbar();
+    } else {
+        // Mobile/Tablet: Hide floating box if visible and show mobile toolbar
+        if (floatBox) {
+            hideAggregatedNutritionFloat();
+        }
+        updateMobileNutritionToolbar();
+    }
+}
+
+// Mobile toolbar functionality
+function showMobileNutritionToolbar(selectedItems) {
+    // Remove existing toolbar if any
+    hideMobileNutritionToolbar();
+    
+    const toolbar = document.createElement('div');
+    toolbar.className = 'mobile-nutrition-toolbar';
+    toolbar.id = 'mobileNutritionToolbar';
+    
+    const itemNames = selectedItems.map(item => item.name).join(', ');
+    const truncatedNames = itemNames.length > 40 ? itemNames.substring(0, 40) + '...' : itemNames;
+    
+    toolbar.innerHTML = `
+        <div class="toolbar-content">
+            <div class="selected-info">
+                <div class="selected-count">📊 ${selectedItems.length}개 항목 선택</div>
+                <div class="selected-items">${truncatedNames}</div>
+            </div>
+            <button class="toolbar-button" onclick="showNutritionFromToolbar()">
+                영양성분 보기
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(toolbar);
+    
+    // Trigger animation
+    setTimeout(() => {
+        toolbar.classList.add('visible');
+    }, 50);
+}
+
+function hideMobileNutritionToolbar() {
+    const toolbar = document.getElementById('mobileNutritionToolbar');
+    if (toolbar) {
+        toolbar.classList.remove('visible');
+        setTimeout(() => {
+            toolbar.remove();
+        }, 300);
+    }
+}
+
+function updateMobileNutritionToolbar() {
+    if (selectedTakeoutItems.size === 0) {
+        hideMobileNutritionToolbar();
+    } else if (window.currentTakeoutItems && selectedTakeoutItems.size > 0) {
+        const selectedItems = Array.from(selectedTakeoutItems).map(index => window.currentTakeoutItems[index]);
+        showMobileNutritionToolbar(selectedItems);
+    }
+}
+
+// Mobile toolbar button action
+window.showNutritionFromToolbar = function() {
+    if (!window.currentTakeoutItems || selectedTakeoutItems.size === 0) {
+        return;
+    }
+    
+    const selectedItems = Array.from(selectedTakeoutItems).map(index => window.currentTakeoutItems[index]);
+    const aggregatedNutrition = calculateAggregatedNutrition(selectedItems);
+    showAggregatedNutritionModal(selectedItems, aggregatedNutrition);
+};
+
+// Handle window resize to switch between floating box and modal
+window.addEventListener('resize', function() {
+    updateAggregatedNutritionDisplay();
+});
+
+// URL State Management - Shareable URLs with hash fragments
+function updateURLHash() {
+    try {
+        const state = getCurrentViewState();
+        const hash = encodeViewState(state);
+        
+        // Update URL without triggering reload
+        if (window.location.hash !== hash) {
+            history.replaceState(null, null, hash);
+            console.log('📍 Updated URL hash:', hash);
+        }
+    } catch (error) {
+        console.error('❌ Error updating URL hash:', error);
+    }
+}
+
+function getCurrentViewState() {
+    // Get current active tab
+    const activeTab = document.querySelector('.header-tab-btn.active')?.textContent?.trim() || 'gallery';
+    let tabName = 'gallery'; // default
+    
+    if (activeTab.includes('식당 설정')) tabName = 'restaurants';
+    else if (activeTab.includes('테이크 인')) tabName = 'takein';
+    else if (activeTab.includes('테이크 아웃')) tabName = 'takeout';
+    else if (activeTab.includes('갤러리')) tabName = 'gallery';
+    else if (activeTab.includes('설정')) tabName = 'system';
+    
+    const state = {
+        tab: tabName,
+        date: null,
+        mealTime: null,
+        filters: {},
+        sort: null,
+        view: {}
+    };
+    
+    // Get date and meal time based on current tab
+    if (tabName === 'takein') {
+        state.date = document.getElementById('takeinMealDate')?.value;
+        state.mealTime = document.getElementById('takeinMealTimeId')?.value;
+        state.filters.mainOnly = document.getElementById('takeinFilterMainOnly')?.checked;
+        state.filters.excludeOptional = document.getElementById('takeinFilterExcludeOptional')?.checked;
+        state.view.tableView = document.querySelector('input[name="takeinTableView"]:checked')?.value;
+        
+        // Capture table sort state
+        const takeinTable = document.querySelector('#takeinMealsResults .meals-table');
+        if (takeinTable) {
+            const sortColumn = takeinTable.getAttribute('data-sort-column');
+            const sortDirection = takeinTable.getAttribute('data-sort-direction');
+            const sortType = takeinTable.getAttribute('data-sort-type');
+            if (sortColumn && sortDirection) {
+                state.tableSort = `${sortColumn}:${sortDirection}:${sortType || 'string'}`;
+            }
+        }
+    } else if (tabName === 'takeout') {
+        state.date = document.getElementById('takeoutMealDate')?.value;
+        state.mealTime = document.getElementById('takeoutMealTimeId')?.value;
+        state.filters.excludeDrinks = document.getElementById('takeoutFilterDrinks')?.checked;
+        state.view.tableView = document.querySelector('input[name="takeoutTableView"]:checked')?.value;
+        state.restaurant = document.getElementById('takeoutRestaurantSelect')?.value;
+        
+        // Capture table sort state
+        const takeoutTable = document.querySelector('#takeoutMealsResults .meals-table');
+        if (takeoutTable) {
+            const sortColumn = takeoutTable.getAttribute('data-sort-column');
+            const sortDirection = takeoutTable.getAttribute('data-sort-direction');
+            const sortType = takeoutTable.getAttribute('data-sort-type');
+            if (sortColumn && sortDirection) {
+                state.tableSort = `${sortColumn}:${sortDirection}:${sortType || 'string'}`;
+            }
+        }
+        // Note: selected items are not included for privacy/complexity
+    } else if (tabName === 'gallery') {
+        state.date = document.getElementById('galleryDate')?.value;
+        state.mealTime = document.getElementById('galleryMealTimeId')?.value;
+        state.sort = document.getElementById('gallerySortBy')?.value;
+        state.filters.showLabels = document.getElementById('galleryShowLabels')?.checked;
+    }
+    
+    return state;
+}
+
+function encodeViewState(state) {
+    const params = new URLSearchParams();
+    
+    params.set('tab', state.tab);
+    
+    if (state.date) params.set('date', state.date);
+    if (state.mealTime) params.set('meal', state.mealTime);
+    if (state.sort) params.set('sort', state.sort);
+    if (state.restaurant) params.set('restaurant', state.restaurant);
+    if (state.tableSort) params.set('tableSort', state.tableSort);
+    
+    // Encode filters
+    Object.entries(state.filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+            params.set(`f_${key}`, value.toString());
+        }
+    });
+    
+    // Encode view settings
+    Object.entries(state.view).forEach(([key, value]) => {
+        if (value) params.set(`v_${key}`, value);
+    });
+    
+    return '#' + params.toString();
+}
+
+function decodeViewState(hash) {
+    if (!hash || hash === '#') return null;
+    
+    const params = new URLSearchParams(hash.substring(1));
+    
+    const state = {
+        tab: params.get('tab') || 'gallery',
+        date: params.get('date'),
+        mealTime: params.get('meal'),
+        sort: params.get('sort'),
+        restaurant: params.get('restaurant'),
+        tableSort: params.get('tableSort'),
+        filters: {},
+        view: {}
+    };
+    
+    // Decode filters
+    for (const [key, value] of params.entries()) {
+        if (key.startsWith('f_')) {
+            const filterName = key.substring(2);
+            state.filters[filterName] = value === 'true';
+        } else if (key.startsWith('v_')) {
+            const viewName = key.substring(2);
+            state.view[viewName] = value;
+        }
+    }
+    
+    return state;
+}
+
+function applyViewState(state) {
+    if (!state) {
+        console.log('❌ No state to apply');
+        return;
+    }
+    
+    console.log('🔄 Applying view state:', state);
+    console.log('🔄 Tab to switch to:', state.tab);
+    
+    // Switch to the correct tab
+    switchToTab(state.tab);
+    
+    // Apply date and meal time
+    if (state.date) {
+        const dateInputs = ['takeinMealDate', 'takeoutMealDate', 'galleryDate'];
+        dateInputs.forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = state.date;
+        });
+    }
+    
+    if (state.mealTime) {
+        const mealTimeInputs = ['takeinMealTimeId', 'takeoutMealTimeId', 'galleryMealTimeId'];
+        mealTimeInputs.forEach(id => {
+            const select = document.getElementById(id);
+            if (select && select.querySelector(`option[value="${state.mealTime}"]`)) {
+                select.value = state.mealTime;
+            }
+        });
+    }
+    
+    // Apply filters
+    Object.entries(state.filters).forEach(([key, value]) => {
+        const mapping = {
+            'mainOnly': 'takeinFilterMainOnly',
+            'excludeOptional': 'takeinFilterExcludeOptional',
+            'excludeDrinks': 'takeoutFilterDrinks',
+            'showLabels': 'galleryShowLabels'
+        };
+        
+        const elementId = mapping[key];
+        if (elementId) {
+            const element = document.getElementById(elementId);
+            if (element) element.checked = value;
+        }
+    });
+    
+    // Apply sort
+    if (state.sort) {
+        const sortSelect = document.getElementById('gallerySortBy');
+        if (sortSelect) sortSelect.value = state.sort;
+    }
+    
+    // Apply restaurant selection
+    if (state.restaurant) {
+        const restaurantSelect = document.getElementById('takeoutRestaurantSelect');
+        if (restaurantSelect && restaurantSelect.querySelector(`option[value="${state.restaurant}"]`)) {
+            restaurantSelect.value = state.restaurant;
+        }
+    }
+    
+    // Apply table sort
+    if (state.tableSort) {
+        const [columnIndex, direction, dataType] = state.tableSort.split(':');
+        const currentTab = state.tab;
+        let tableSelector = '';
+        
+        if (currentTab === 'takein') {
+            tableSelector = '#takeinMealsResults .meals-table';
+        } else if (currentTab === 'takeout') {
+            tableSelector = '#takeoutMealsResults .meals-table';
+        }
+        
+        if (tableSelector) {
+            setTimeout(() => {
+                const table = document.querySelector(tableSelector);
+                if (table && table.querySelector('tbody')) {
+                    sortTable(table.id || 'meals-table', parseInt(columnIndex), dataType || 'string', direction);
+                }
+            }, 500); // Delay to ensure table is loaded
+        }
+    }
+    
+    // Apply view settings
+    Object.entries(state.view).forEach(([key, value]) => {
+        if (key === 'tableView') {
+            const radios = document.querySelectorAll(`input[name="${state.tab}TableView"]`);
+            radios.forEach(radio => {
+                if (radio.value === value) radio.checked = true;
+            });
+        }
+    });
+}
+
+function switchToTab(tabName) {
+    // Directly switch to tab without triggering URL update (used for applying URL state)
+    console.log('🔄 Switching to tab:', tabName);
+    
+    const tabMap = {
+        'restaurants': '식당 설정',
+        'takein': '테이크 인',
+        'takeout': '테이크 아웃',
+        'gallery': '갤러리',
+        'system': '설정'
+    };
+    
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    console.log('🔄 Found tab contents:', tabContents.length);
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.header-tab-btn');
+    console.log('🔄 Found tab buttons:', tabButtons.length);
+    tabButtons.forEach(button => {
+        button.classList.remove('active');
+    });
+    
+    // Show selected tab content
+    const selectedTab = document.getElementById(tabName + '-tab');
+    console.log('🔄 Looking for tab ID:', tabName + '-tab');
+    console.log('🔄 Found tab element:', selectedTab);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+        console.log('✅ Tab activated:', tabName);
+    } else {
+        console.log('❌ Tab not found:', tabName + '-tab');
+    }
+    
+    // Add active class to the correct button
+    const targetText = tabMap[tabName];
+    if (targetText) {
+        const targetButton = Array.from(tabButtons).find(btn => btn.textContent.includes(targetText));
+        if (targetButton) {
+            targetButton.classList.add('active');
+        }
+    }
+    
+    // Auto-fetch meals when switching to meal tabs
+    if (tabName === 'takein') {
+        if (selectedRestaurants.length === 0) {
+            showStatus('takeinMealsStatus', 'Please select restaurants first in the Restaurant Selection tab', 'info');
+        } else {
+            // Automatically fetch meals if we have restaurants selected and required fields
+            const mealDate = document.getElementById('takeinMealDate').value;
+            const mealTimeId = document.getElementById('takeinMealTimeId').value;
+            
+            if (mealDate && mealTimeId) {
+                console.log('🍴 Auto-fetching Take In meals for selected restaurants...');
+                getTakeinMeals();
+            }
+        }
+    } else if (tabName === 'takeout') {
+        // Auto-fetch meals if we have everything needed
+        if (selectedTakeoutRestaurant) {
+            const mealDate = document.getElementById('takeoutMealDate').value;
+            const mealTimeId = document.getElementById('takeoutMealTimeId').value;
+            
+            if (mealDate && mealTimeId) {
+                console.log('📦 Auto-fetching Take Out meals...');
+                getTakeoutMeals();
+            }
+        }
+    } else if (tabName === 'gallery') {
+        // Auto-load gallery if we have everything needed
+        if (selectedRestaurants.length > 0) {
+            const mealDate = document.getElementById('galleryDate').value;
+            const mealTimeId = document.getElementById('galleryMealTimeId').value;
+            
+            if (mealDate && mealTimeId) {
+                console.log('🖼️ Auto-loading gallery...');
+                loadGallery();
+            }
+        }
+    }
+}
+
+// Initialize URL state management
+function initializeURLStateManagement() {
+    console.log('🚀 Initializing URL state management');
+    
+    // Load state from URL on page load
+    const hash = window.location.hash;
+    console.log('🔍 Current hash:', hash);
+    
+    if (hash && hash !== '#') {
+        console.log('📋 Decoding hash state...');
+        const state = decodeViewState(hash);
+        console.log('📋 Decoded state:', state);
+        
+        // Wait for restaurant dropdown to be populated before applying state
+        const waitForRestaurantData = () => {
+            const dropdown = document.getElementById('takeoutRestaurantSelect');
+            console.log('⏳ Checking dropdown:', dropdown ? dropdown.children.length : 'not found');
+            
+            if (dropdown && dropdown.children.length > 1) {
+                // Restaurant options are loaded
+                console.log('✅ Restaurant dropdown ready, applying state');
+                applyViewState(state);
+            } else {
+                // Check again in 100ms
+                console.log('⏳ Waiting for restaurant data...');
+                setTimeout(waitForRestaurantData, 100);
+            }
+        };
+        
+        setTimeout(waitForRestaurantData, 100); // Start checking after initial delay
+    } else {
+        console.log('ℹ️ No hash to process');
+    }
+    
+    // Listen for hash changes (back/forward navigation)
+    window.addEventListener('hashchange', function() {
+        const state = decodeViewState(window.location.hash);
+        applyViewState(state);
+    });
+    
+    // Update URL when view changes
+    const updateEvents = [
+        'change', 'click', 'input'
+    ];
+    
+    updateEvents.forEach(eventType => {
+        document.addEventListener(eventType, function(e) {
+            // Check for relevant form elements and tab buttons
+            const isRelevantElement = (
+                // Form inputs and selects
+                (e.target.matches('input, select') && 
+                 (e.target.id.includes('Date') || 
+                  e.target.id.includes('Time') || 
+                  e.target.id.includes('Filter') || 
+                  e.target.id.includes('Sort') || 
+                  e.target.id.includes('TableView') ||
+                  e.target.id.includes('galleryShowLabels') ||
+                  (e.target.name && e.target.name.includes('TableView')))) ||
+                // Tab buttons
+                (e.target.matches('button') && e.target.className.includes('header-tab-btn'))
+            );
+            
+            if (isRelevantElement) {
+                // Debounce URL updates (shorter delay for better responsiveness)
+                clearTimeout(window.urlUpdateTimeout);
+                window.urlUpdateTimeout = setTimeout(updateURLHash, 100);
+            }
+        });
+    });
+}
+

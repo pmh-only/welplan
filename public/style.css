@@ -1564,10 +1564,11 @@ button:focus {
 
 .gallery-image {
     width: 100%;
-    height: 200px;
-    object-fit: cover;
+    aspect-ratio: 1/1;
+    object-fit: contain;
+    object-position: center;
     display: block;
-    background: #f3f4f6;
+    background: white;
 }
 
 .gallery-image.loading {
@@ -1915,5 +1916,430 @@ button:focus {
         left: 4px;
         padding: 2px 6px;
         font-size: 12px;
+    }
+}
+
+/* Takeout multi-select styles */
+.takeout-selection-controls {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.selection-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.takeout-selectable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.takeout-selectable-row:hover {
+    background-color: #f3f4f6 !important;
+}
+
+.selected-takeout-item {
+    background-color: #dbeafe !important;
+    border-left: 4px solid #3b82f6;
+}
+
+.selected-takeout-item:hover {
+    background-color: #bfdbfe !important;
+}
+
+/* Enhanced checkbox styling - Global styles for all checkboxes */
+/* Standard checkbox design for selection contexts */
+input[type="checkbox"]:not(.form-group input[type="checkbox"]):not(.filter-option input[type="checkbox"]) {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #d1d5db;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    margin: 0;
+    transform: scale(1.1);
+}
+
+input[type="checkbox"]:not(.form-group input[type="checkbox"]):not(.filter-option input[type="checkbox"]):hover {
+    border-color: #3b82f6;
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+input[type="checkbox"]:not(.form-group input[type="checkbox"]):not(.filter-option input[type="checkbox"]):checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+input[type="checkbox"]:not(.form-group input[type="checkbox"]):not(.filter-option input[type="checkbox"]):checked::before {
+    content: '✓';
+    position: absolute;
+    top: -1px;
+    left: 2px;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+input[type="checkbox"]:not(.form-group input[type="checkbox"]):not(.filter-option input[type="checkbox"]):focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+input[type="checkbox"]:not(.form-group input[type="checkbox"]):not(.filter-option input[type="checkbox"]):disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Enhanced filter checkbox styling */
+.filter-option input[type="checkbox"] {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #d1d5db;
+    border-radius: 3px;
+    background: white;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.filter-option input[type="checkbox"]:hover {
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.filter-option input[type="checkbox"]:checked {
+    background-color: #10b981;
+    border-color: #10b981;
+}
+
+.filter-option input[type="checkbox"]:checked::before {
+    content: '✓';
+    position: absolute;
+    top: -2px;
+    left: 1px;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.filter-option input[type="checkbox"]:focus {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
+}
+
+/* Checkbox column styling for tables */
+.takeout-selectable-row td:first-child {
+    text-align: center;
+    width: 50px;
+    padding: 12px 8px;
+}
+
+/* Restaurant selection checkbox styling */
+.restaurant-checkbox {
+    margin-right: 8px;
+}
+
+/* Gallery controls checkbox styling */
+#galleryShowLabels {
+    margin-right: 6px;
+}
+
+/* Floating aggregated nutrition box for PC */
+.aggregated-nutrition-float {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    max-width: 350px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(100px);
+    transition: all 0.3s ease-in-out;
+    pointer-events: none;
+}
+
+.aggregated-nutrition-float.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.aggregated-nutrition-float .float-header {
+    padding: 15px 15px 10px 15px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.aggregated-nutrition-float .float-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin: 0;
+}
+
+.aggregated-nutrition-float .float-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.aggregated-nutrition-float .float-close:hover {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.aggregated-nutrition-float .float-content {
+    padding: 15px;
+}
+
+.aggregated-nutrition-float .nutrition-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.aggregated-nutrition-float .nutrition-item {
+    text-align: center;
+    padding: 8px;
+    background: #f9fafb;
+    border-radius: 6px;
+}
+
+.aggregated-nutrition-float .nutrition-label {
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.aggregated-nutrition-float .nutrition-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.aggregated-nutrition-float .pscore-item {
+    grid-column: span 2;
+}
+
+.aggregated-nutrition-float .pscore-value {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.aggregated-nutrition-float .selected-items-count {
+    font-size: 12px;
+    color: #6b7280;
+    text-align: center;
+    padding: 8px;
+    background: #f3f4f6;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.aggregated-nutrition-float .float-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.aggregated-nutrition-float .btn-float {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    background: white;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.aggregated-nutrition-float .btn-float:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.aggregated-nutrition-float .btn-float.btn-primary {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.aggregated-nutrition-float .btn-float.btn-primary:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+/* Hide floating box on mobile and tablet */
+@media (max-width: 1024px) {
+    .aggregated-nutrition-float {
+        display: none;
+    }
+}
+
+/* Mobile floating bottom toolbar */
+.mobile-nutrition-toolbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    padding: 12px 16px;
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(100%);
+    transition: all 0.3s ease-in-out;
+    pointer-events: none;
+}
+
+.mobile-nutrition-toolbar.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.mobile-nutrition-toolbar .toolbar-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 100%;
+}
+
+.mobile-nutrition-toolbar .selected-info {
+    flex: 1;
+    margin-right: 12px;
+}
+
+.mobile-nutrition-toolbar .selected-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 2px;
+}
+
+.mobile-nutrition-toolbar .selected-items {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-nutrition-toolbar .toolbar-button {
+    padding: 10px 16px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.mobile-nutrition-toolbar .toolbar-button:hover {
+    background: #2563eb;
+}
+
+.mobile-nutrition-toolbar .toolbar-button:active {
+    transform: scale(0.98);
+}
+
+/* Hide mobile toolbar on PC */
+@media (min-width: 1025px) {
+    .mobile-nutrition-toolbar {
+        display: none;
+    }
+}
+
+/* Share button and notification animations */
+.share-button {
+    background: #3b82f6 !important;
+    color: white !important;
+    border: 1px solid #3b82f6 !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+}
+
+.share-button:hover {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Responsive styles for takeout selection */
+@media (max-width: 768px) {
+    .takeout-selection-controls {
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .selection-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    
+    .selection-actions button {
+        width: 100%;
+        text-align: center;
     }
 }
