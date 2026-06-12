@@ -1,3 +1,7 @@
+> [!NOTE]
+> **Deprecated**\
+> See: https://github.com/pmh-only/welplan2
+
 # Welplan
 A full-stack web application for interacting with the Samsung Welstory cafeteria API using the [`welstory-api-wrapper`](https://github.com/pmh-only/welstory-api-wrapper) library.
 
